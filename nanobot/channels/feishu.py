@@ -117,7 +117,7 @@ class FeishuChannel(BaseChannel):
     async def start(self) -> None:
         """Start the Feishu bot with WebSocket long connection."""
         if not FEISHU_AVAILABLE:
-            logger.error("Feishu SDK not installed. Run: pip install lark-oapi")
+            logger.error("Feishu dependencies not installed. Run: pip install nanobot-ai[feishu]")
             return
         
         if not self.config.app_id or not self.config.app_secret:

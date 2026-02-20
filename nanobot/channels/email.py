@@ -174,14 +174,14 @@ class EmailChannel(BaseChannel):
                 self.config.smtp_port,
                 timeout=timeout,
             ) as smtp:
-                smtp.login(self.config.smtp_username, self.config.smtp_password)
+                smtp.login(self.config.smtp_username, self.config.smtp_password.get_secret_value())
                 smtp.send_message(msg)
             return
 
         with smtplib.SMTP(self.config.smtp_host, self.config.smtp_port, timeout=timeout) as smtp:
             if self.config.smtp_use_tls:
                 smtp.starttls(context=ssl.create_default_context())
-            smtp.login(self.config.smtp_username, self.config.smtp_password)
+            smtp.login(self.config.smtp_username, self.config.smtp_password.get_secret_value())
             smtp.send_message(msg)
 
     def _fetch_new_messages(self) -> list[dict[str, Any]]:
@@ -236,7 +236,7 @@ class EmailChannel(BaseChannel):
             client = imaplib.IMAP4(self.config.imap_host, self.config.imap_port)
 
         try:
-            client.login(self.config.imap_username, self.config.imap_password)
+            client.login(self.config.imap_username, self.config.imap_password.get_secret_value())
             status, _ = client.select(mailbox)
             if status != "OK":
                 return messages

@@ -188,7 +188,7 @@ class DebateOrchestrator:
             return self.provider, persona_model
 
         persona_provider = LiteLLMProvider(
-            api_key=p.api_key,
+            api_key=p.get_api_key_value(),
             api_base=self.config.get_api_base(persona_model),
             default_model=persona_model,
             extra_headers=p.extra_headers,
@@ -297,7 +297,7 @@ class DebateOrchestrator:
             return self.provider, orch_model
 
         return LiteLLMProvider(
-            api_key=p.api_key,
+            api_key=p.get_api_key_value(),
             api_base=self.config.get_api_base(orch_model),
             default_model=orch_model,
             extra_headers=p.extra_headers,

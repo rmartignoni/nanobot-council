@@ -1,9 +1,11 @@
 """Web tools: web_search and web_fetch."""
 
 import html
+import ipaddress
 import json
 import os
 import re
+import socket
 from typing import Any
 from urllib.parse import urlparse
 
@@ -39,6 +41,24 @@ def _validate_url(url: str) -> tuple[bool, str]:
         if not p.netloc:
             return False, "Missing domain"
         return True, ""
+    except Exception as e:
+        return False, str(e)
+
+
+def _check_ssrf(url: str) -> tuple[bool, str]:
+    """Check if URL resolves to a private/internal IP (SSRF protection)."""
+    try:
+        hostname = urlparse(url).hostname
+        if not hostname:
+            return False, "Missing hostname"
+        addrs = socket.getaddrinfo(hostname, None, proto=socket.IPPROTO_TCP)
+        for family, _, _, _, sockaddr in addrs:
+            ip = ipaddress.ip_address(sockaddr[0])
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                return False, f"URL resolves to private/internal IP ({ip})"
+        return True, ""
+    except socket.gaierror:
+        return False, f"Could not resolve hostname: {hostname}"
     except Exception as e:
         return False, str(e)
 
@@ -117,6 +137,11 @@ class WebFetchTool(Tool):
         is_valid, error_msg = _validate_url(url)
         if not is_valid:
             return json.dumps({"error": f"URL validation failed: {error_msg}", "url": url}, ensure_ascii=False)
+
+        # SSRF protection: block requests to private/internal IPs
+        is_safe, ssrf_msg = _check_ssrf(url)
+        if not is_safe:
+            return json.dumps({"error": f"SSRF protection: {ssrf_msg}", "url": url}, ensure_ascii=False)
 
         try:
             async with httpx.AsyncClient(

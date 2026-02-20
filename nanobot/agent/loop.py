@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import re
 from contextlib import AsyncExitStack
 from pathlib import Path
 from typing import TYPE_CHECKING, Awaitable, Callable
@@ -13,19 +12,17 @@ import json_repair
 from loguru import logger
 
 from nanobot.agent.context import ContextBuilder
+from nanobot.agent.core_loop import run_tool_loop
 from nanobot.agent.memory import MemoryStore
 from nanobot.agent.subagent import SubagentManager
 from nanobot.agent.tools.cron import CronTool
-from nanobot.agent.tools.filesystem import EditFileTool, ListDirTool, ReadFileTool, WriteFileTool
+from nanobot.agent.tools.debate import DebateTool
+from nanobot.agent.tools.factory import build_safe_tools
 from nanobot.agent.tools.message import MessageTool
-from nanobot.agent.tools.registry import ToolRegistry
-from nanobot.agent.tools.shell import ExecTool
 from nanobot.agent.tools.spawn import SpawnTool
-from nanobot.agent.tools.web import WebFetchTool, WebSearchTool
 from nanobot.bus.events import InboundMessage, OutboundMessage
 from nanobot.bus.queue import MessageBus
 from nanobot.providers.base import LLMProvider
-from nanobot.agent.tools.debate import DebateTool
 from nanobot.session.manager import Session, SessionManager
 
 if TYPE_CHECKING:
@@ -80,7 +77,6 @@ class AgentLoop:
 
         self.context = ContextBuilder(workspace)
         self.sessions = session_manager or SessionManager(workspace)
-        self.tools = ToolRegistry()
         self.subagents = SubagentManager(
             provider=provider,
             workspace=workspace,
@@ -100,27 +96,23 @@ class AgentLoop:
         self._mcp_connecting = False
         self._consolidating: set[str] = set()  # Session keys with consolidation in progress
         self._current_progress: Callable[[str], Awaitable[None]] | None = None
+        self._background_tasks: set[asyncio.Task] = set()
         self._register_default_tools()
+
+    def _track_task(self, task: asyncio.Task) -> None:
+        """Track a fire-and-forget background task to prevent GC collection."""
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
 
     def _register_default_tools(self) -> None:
         """Register the default set of tools."""
-        # File tools (workspace for relative paths, restrict if configured)
-        allowed_dir = self.workspace if self.restrict_to_workspace else None
-        self.tools.register(ReadFileTool(workspace=self.workspace, allowed_dir=allowed_dir))
-        self.tools.register(WriteFileTool(workspace=self.workspace, allowed_dir=allowed_dir))
-        self.tools.register(EditFileTool(workspace=self.workspace, allowed_dir=allowed_dir))
-        self.tools.register(ListDirTool(workspace=self.workspace, allowed_dir=allowed_dir))
-
-        # Shell tool
-        self.tools.register(ExecTool(
-            working_dir=str(self.workspace),
-            timeout=self.exec_config.timeout,
+        # Base safe tools (filesystem, shell, web)
+        self.tools = build_safe_tools(
+            workspace=self.workspace,
+            exec_config=self.exec_config,
+            brave_api_key=self.brave_api_key,
             restrict_to_workspace=self.restrict_to_workspace,
-        ))
-
-        # Web tools
-        self.tools.register(WebSearchTool(api_key=self.brave_api_key))
-        self.tools.register(WebFetchTool())
+        )
 
         # Message tool
         message_tool = MessageTool(send_callback=self.bus.publish_outbound)
@@ -191,23 +183,6 @@ class AgentLoop:
             if isinstance(debate_tool, DebateTool):
                 debate_tool.set_context(on_progress=self._current_progress)
 
-    @staticmethod
-    def _strip_think(text: str | None) -> str | None:
-        """Remove <think>…</think> blocks that some models embed in content."""
-        if not text:
-            return None
-        return re.sub(r"<think>[\s\S]*?</think>", "", text).strip() or None
-
-    @staticmethod
-    def _tool_hint(tool_calls: list) -> str:
-        """Format tool calls as concise hint, e.g. 'web_search("query")'."""
-        def _fmt(tc):
-            val = next(iter(tc.arguments.values()), None) if tc.arguments else None
-            if not isinstance(val, str):
-                return tc.name
-            return f'{tc.name}("{val[:40]}…")' if len(val) > 40 else f'{tc.name}("{val}")'
-        return ", ".join(_fmt(tc) for tc in tool_calls)
-
     async def _run_agent_loop(
         self,
         initial_messages: list[dict],
@@ -223,66 +198,17 @@ class AgentLoop:
         Returns:
             Tuple of (final_content, list_of_tools_used).
         """
-        messages = initial_messages
-        iteration = 0
-        final_content = None
-        tools_used: list[str] = []
-        text_only_retried = False
-
-        while iteration < self.max_iterations:
-            iteration += 1
-
-            response = await self.provider.chat(
-                messages=messages,
-                tools=self.tools.get_definitions(),
-                model=self.model,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-            )
-
-            if response.has_tool_calls:
-                if on_progress:
-                    clean = self._strip_think(response.content)
-                    if clean:
-                        await on_progress(clean)
-                    await on_progress(self._tool_hint(response.tool_calls))
-
-                tool_call_dicts = [
-                    {
-                        "id": tc.id,
-                        "type": "function",
-                        "function": {
-                            "name": tc.name,
-                            "arguments": json.dumps(tc.arguments, ensure_ascii=False)
-                        }
-                    }
-                    for tc in response.tool_calls
-                ]
-                messages = self.context.add_assistant_message(
-                    messages, response.content, tool_call_dicts,
-                    reasoning_content=response.reasoning_content,
-                )
-
-                for tool_call in response.tool_calls:
-                    tools_used.append(tool_call.name)
-                    args_str = json.dumps(tool_call.arguments, ensure_ascii=False)
-                    logger.info("Tool call: {}({})", tool_call.name, args_str[:200])
-                    result = await self.tools.execute(tool_call.name, tool_call.arguments)
-                    messages = self.context.add_tool_result(
-                        messages, tool_call.id, tool_call.name, result
-                    )
-            else:
-                final_content = self._strip_think(response.content)
-                # Some models send an interim text response before tool calls.
-                # Give them one retry; don't forward the text to avoid duplicates.
-                if not tools_used and not text_only_retried and final_content:
-                    text_only_retried = True
-                    logger.debug("Interim text response (no tools used yet), retrying: {}", final_content[:80])
-                    final_content = None
-                    continue
-                break
-
-        return final_content, tools_used
+        return await run_tool_loop(
+            provider=self.provider,
+            messages=initial_messages,
+            tools=self.tools,
+            model=self.model,
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+            max_iterations=self.max_iterations,
+            text_only_retry=True,
+            on_progress=on_progress,
+        )
 
     async def run(self) -> None:
         """Run the agent loop, processing messages from the bus."""
@@ -366,7 +292,7 @@ class AgentLoop:
                 temp_session.messages = messages_to_archive
                 await self._consolidate_memory(temp_session, archive_all=True)
 
-            asyncio.create_task(_consolidate_and_cleanup())
+            self._track_task(asyncio.create_task(_consolidate_and_cleanup()))
             return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
                                   content="New session started. Memory consolidation in progress.")
         if cmd == "/help":
@@ -382,7 +308,7 @@ class AgentLoop:
                 finally:
                     self._consolidating.discard(session.key)
 
-            asyncio.create_task(_consolidate_and_unlock())
+            self._track_task(asyncio.create_task(_consolidate_and_unlock()))
 
         async def _bus_progress(content: str) -> None:
             meta = dict(msg.metadata or {})
@@ -536,12 +462,15 @@ Example:
 Respond with ONLY valid JSON, no markdown fences."""
 
         try:
-            response = await self.provider.chat(
-                messages=[
-                    {"role": "system", "content": "You are a memory consolidation agent. Respond only with valid JSON."},
-                    {"role": "user", "content": prompt},
-                ],
-                model=self.model,
+            response = await asyncio.wait_for(
+                self.provider.chat(
+                    messages=[
+                        {"role": "system", "content": "You are a memory consolidation agent. Respond only with valid JSON."},
+                        {"role": "user", "content": prompt},
+                    ],
+                    model=self.model,
+                ),
+                timeout=60,
             )
             text = (response.content or "").strip()
             if not text:
@@ -571,6 +500,8 @@ Respond with ONLY valid JSON, no markdown fences."""
             else:
                 session.last_consolidated = len(session.messages) - keep_count
             logger.info("Memory consolidation done: {} messages, last_consolidated={}", len(session.messages), session.last_consolidated)
+        except asyncio.TimeoutError:
+            logger.warning("Memory consolidation timed out after 60s")
         except Exception as e:
             logger.error("Memory consolidation failed: {}", e)
 

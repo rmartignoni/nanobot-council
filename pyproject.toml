@@ -29,16 +29,6 @@ dependencies = [
     "readability-lxml>=0.8.4,<1.0.0",
     "rich>=14.0.0,<15.0.0",
     "croniter>=6.0.0,<7.0.0",
-    "dingtalk-stream>=0.24.0,<1.0.0",
-    "python-telegram-bot[socks]>=22.0,<23.0",
-    "lark-oapi>=1.5.0,<2.0.0",
-    "socksio>=1.0.0,<2.0.0",
-    "python-socketio>=5.16.0,<6.0.0",
-    "msgpack>=1.1.0,<2.0.0",
-    "slack-sdk>=3.39.0,<4.0.0",
-    "slackify-markdown>=0.2.0,<1.0.0",
-    "qq-botpy>=1.2.0,<2.0.0",
-    "python-socks[asyncio]>=2.8.0,<3.0.0",
     "prompt-toolkit>=3.0.50,<4.0.0",
     "mcp>=1.26.0,<2.0.0",
     "json-repair>=0.57.0,<1.0.0",
@@ -46,6 +36,38 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+telegram = [
+    "python-telegram-bot[socks]>=22.0,<23.0",
+    "socksio>=1.0.0,<2.0.0",
+    "python-socks[asyncio]>=2.8.0,<3.0.0",
+]
+discord = []  # uses httpx + websockets from core
+whatsapp = []  # uses websockets from core
+slack = [
+    "slack-sdk>=3.39.0,<4.0.0",
+    "slackify-markdown>=0.2.0,<1.0.0",
+]
+feishu = [
+    "lark-oapi>=1.5.0,<2.0.0",
+]
+dingtalk = [
+    "dingtalk-stream>=0.24.0,<1.0.0",
+]
+mochat = [
+    "python-socketio>=5.16.0,<6.0.0",
+    "msgpack>=1.1.0,<2.0.0",
+]
+qq = [
+    "qq-botpy>=1.2.0,<2.0.0",
+]
+all-channels = [
+    "nanobot-ai[telegram]",
+    "nanobot-ai[slack]",
+    "nanobot-ai[feishu]",
+    "nanobot-ai[dingtalk]",
+    "nanobot-ai[mochat]",
+    "nanobot-ai[qq]",
+]
 dev = [
     "pytest>=9.0.0,<10.0.0",
     "pytest-asyncio>=1.3.0,<2.0.0",

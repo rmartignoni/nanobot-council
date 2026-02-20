@@ -4,15 +4,26 @@ from __future__ import annotations
 
 import asyncio
 import re
+from typing import TYPE_CHECKING
+
 from loguru import logger
-from telegram import BotCommand, Update, ReplyParameters
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from telegram.request import HTTPXRequest
 
 from nanobot.bus.events import OutboundMessage
 from nanobot.bus.queue import MessageBus
-from nanobot.channels.base import BaseChannel
+from nanobot.channels.base import BaseChannel, split_message
 from nanobot.config.schema import TelegramConfig
+
+try:
+    from telegram import BotCommand, Update, ReplyParameters
+    from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+    from telegram.request import HTTPXRequest
+    TELEGRAM_AVAILABLE = True
+except ImportError:
+    TELEGRAM_AVAILABLE = False
+    if TYPE_CHECKING:
+        from telegram import BotCommand, Update, ReplyParameters
+        from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+        from telegram.request import HTTPXRequest
 
 
 def _markdown_to_telegram_html(text: str) -> str:
@@ -78,25 +89,6 @@ def _markdown_to_telegram_html(text: str) -> str:
     return text
 
 
-def _split_message(content: str, max_len: int = 4000) -> list[str]:
-    """Split content into chunks within max_len, preferring line breaks."""
-    if len(content) <= max_len:
-        return [content]
-    chunks: list[str] = []
-    while content:
-        if len(content) <= max_len:
-            chunks.append(content)
-            break
-        cut = content[:max_len]
-        pos = cut.rfind('\n')
-        if pos == -1:
-            pos = cut.rfind(' ')
-        if pos == -1:
-            pos = max_len
-        chunks.append(content[:pos])
-        content = content[pos:].lstrip()
-    return chunks
-
 
 class TelegramChannel(BaseChannel):
     """
@@ -106,14 +98,7 @@ class TelegramChannel(BaseChannel):
     """
     
     name = "telegram"
-    
-    # Commands registered with Telegram's command menu
-    BOT_COMMANDS = [
-        BotCommand("start", "Start the bot"),
-        BotCommand("new", "Start a new conversation"),
-        BotCommand("help", "Show available commands"),
-    ]
-    
+
     def __init__(
         self,
         config: TelegramConfig,
@@ -129,12 +114,16 @@ class TelegramChannel(BaseChannel):
     
     async def start(self) -> None:
         """Start the Telegram bot with long polling."""
+        if not TELEGRAM_AVAILABLE:
+            logger.error("Telegram dependencies not installed. Run: pip install nanobot-ai[telegram]")
+            return
+
         if not self.config.token:
             logger.error("Telegram bot token not configured")
             return
-        
+
         self._running = True
-        
+
         # Build the application with larger connection pool to avoid pool-timeout on long runs
         req = HTTPXRequest(connection_pool_size=16, pool_timeout=5.0, connect_timeout=30.0, read_timeout=30.0)
         builder = Application.builder().token(self.config.token).request(req).get_updates_request(req)
@@ -167,8 +156,13 @@ class TelegramChannel(BaseChannel):
         bot_info = await self._app.bot.get_me()
         logger.info("Telegram bot @{} connected", bot_info.username)
         
+        bot_commands = [
+            BotCommand("start", "Start the bot"),
+            BotCommand("new", "Start a new conversation"),
+            BotCommand("help", "Show available commands"),
+        ]
         try:
-            await self._app.bot.set_my_commands(self.BOT_COMMANDS)
+            await self._app.bot.set_my_commands(bot_commands)
             logger.debug("Telegram bot commands registered")
         except Exception as e:
             logger.warning("Failed to register bot commands: {}", e)
@@ -260,7 +254,7 @@ class TelegramChannel(BaseChannel):
 
         # Send text content
         if msg.content and msg.content != "[empty message]":
-            for chunk in _split_message(msg.content):
+            for chunk in split_message(msg.content):
                 try:
                     html = _markdown_to_telegram_html(chunk)
                     await self._app.bot.send_message(

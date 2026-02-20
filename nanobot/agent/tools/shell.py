@@ -32,6 +32,13 @@ class ExecTool(Tool):
             r">\s*/dev/sd",                  # write to disk
             r"\b(shutdown|reboot|poweroff)\b",  # system power
             r":\(\)\s*\{.*\};\s*:",          # fork bomb
+            r"\bprintenv\b",                   # env var access
+            r"\benv\s",                        # env command
+            r"echo\s+\$",                      # echo env variables
+            r"/proc/self/environ",             # direct env access
+            r"curl\s.*\|\s*(ba)?sh",           # download + exec
+            r"wget\s.*\|\s*(ba)?sh",           # download + exec
+            r"\bnc\s+-",                       # netcat
         ]
         self.allow_patterns = allow_patterns or []
         self.restrict_to_workspace = restrict_to_workspace

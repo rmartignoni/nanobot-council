@@ -1,28 +1,33 @@
 """Base channel interface for chat platforms."""
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
 from nanobot.bus.events import InboundMessage, OutboundMessage
 from nanobot.bus.queue import MessageBus
 
+if TYPE_CHECKING:
+    from nanobot.agent.rate_limit import RateLimiter
+
 
 class BaseChannel(ABC):
     """
     Abstract base class for chat channel implementations.
-    
+
     Each channel (Telegram, Discord, etc.) should implement this interface
     to integrate with the nanobot message bus.
     """
-    
+
     name: str = "base"
-    
+
     def __init__(self, config: Any, bus: MessageBus):
         """
         Initialize the channel.
-        
+
         Args:
             config: Channel-specific configuration.
             bus: The message bus for communication.
@@ -30,6 +35,7 @@ class BaseChannel(ABC):
         self.config = config
         self.bus = bus
         self._running = False
+        self._rate_limiter: RateLimiter | None = None
     
     @abstractmethod
     async def start(self) -> None:
@@ -110,7 +116,19 @@ class BaseChannel(ABC):
                 sender_id, self.name,
             )
             return
-        
+
+        if self._rate_limiter:
+            allowed, retry_after = self._rate_limiter.check(str(sender_id))
+            if not allowed:
+                logger.warning("Rate limited sender {} on channel {} (retry in {}s)",
+                               sender_id, self.name, retry_after)
+                await self.bus.publish_outbound(OutboundMessage(
+                    channel=self.name,
+                    chat_id=str(chat_id),
+                    content=f"Too many messages. Please try again in {retry_after} seconds.",
+                ))
+                return
+
         msg = InboundMessage(
             channel=self.name,
             sender_id=str(sender_id),
@@ -119,10 +137,37 @@ class BaseChannel(ABC):
             media=media or [],
             metadata=metadata or {}
         )
-        
+
         await self.bus.publish_inbound(msg)
     
     @property
     def is_running(self) -> bool:
         """Check if the channel is running."""
         return self._running
+
+
+def split_message(content: str, max_len: int = 4000) -> list[str]:
+    """Split content into chunks within max_len, preferring line breaks.
+
+    This is a shared utility for channels that need to split long messages
+    (e.g. Telegram, Discord). Individual channels can import and use this
+    instead of maintaining their own copies.
+    """
+    if not content:
+        return []
+    if len(content) <= max_len:
+        return [content]
+    chunks: list[str] = []
+    while content:
+        if len(content) <= max_len:
+            chunks.append(content)
+            break
+        cut = content[:max_len]
+        pos = cut.rfind("\n")
+        if pos <= 0:
+            pos = cut.rfind(" ")
+        if pos <= 0:
+            pos = max_len
+        chunks.append(content[:pos])
+        content = content[pos:].lstrip()
+    return chunks

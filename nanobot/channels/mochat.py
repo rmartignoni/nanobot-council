@@ -344,7 +344,7 @@ class MochatChannel(BaseChannel):
 
     async def _start_socket_client(self) -> bool:
         if not SOCKETIO_AVAILABLE:
-            logger.warning("python-socketio not installed, Mochat using polling fallback")
+            logger.warning("Mochat dependencies not installed (pip install nanobot-ai[mochat]), using polling fallback")
             return False
 
         serializer = "default"

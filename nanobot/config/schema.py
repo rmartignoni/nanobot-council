@@ -1,7 +1,7 @@
 """Configuration schema using Pydantic."""
 
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, SecretStr, field_serializer
 from pydantic.alias_generators import to_camel
 from pydantic_settings import BaseSettings
 
@@ -71,7 +71,7 @@ class EmailConfig(Base):
     imap_host: str = ""
     imap_port: int = 993
     imap_username: str = ""
-    imap_password: str = ""
+    imap_password: SecretStr | None = None
     imap_mailbox: str = "INBOX"
     imap_use_ssl: bool = True
 
@@ -79,7 +79,8 @@ class EmailConfig(Base):
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_username: str = ""
-    smtp_password: str = ""
+    smtp_password: SecretStr | None = None
+
     smtp_use_tls: bool = True
     smtp_use_ssl: bool = False
     from_address: str = ""
@@ -91,6 +92,11 @@ class EmailConfig(Base):
     max_body_chars: int = 12000
     subject_prefix: str = "Re: "
     allow_from: list[str] = Field(default_factory=list)  # Allowed sender email addresses
+
+    @field_serializer("imap_password", "smtp_password")
+    @classmethod
+    def _serialize_passwords(cls, v: SecretStr | None) -> str | None:
+        return v.get_secret_value() if v else None
 
 
 class MochatMentionConfig(Base):
@@ -199,9 +205,18 @@ class AgentsConfig(Base):
 class ProviderConfig(Base):
     """LLM provider configuration."""
 
-    api_key: str = ""
+    api_key: SecretStr | None = None
     api_base: str | None = None
     extra_headers: dict[str, str] | None = None  # Custom headers (e.g. APP-Code for AiHubMix)
+
+    @field_serializer("api_key")
+    @classmethod
+    def _serialize_api_key(cls, v: SecretStr | None) -> str | None:
+        return v.get_secret_value() if v else None
+
+    def get_api_key_value(self) -> str | None:
+        """Return the plain-text API key, or None."""
+        return self.api_key.get_secret_value() if self.api_key else None
 
 
 class ProvidersConfig(Base):
@@ -226,6 +241,14 @@ class ProvidersConfig(Base):
     github_copilot: ProviderConfig = Field(default_factory=ProviderConfig)  # Github Copilot (OAuth)
 
 
+class RateLimitConfig(Base):
+    """Rate limiting configuration."""
+
+    enabled: bool = False
+    max_messages_per_minute: int = 10
+    max_messages_per_hour: int = 100
+
+
 class GatewayConfig(Base):
     """Gateway/server configuration."""
 
@@ -236,8 +259,13 @@ class GatewayConfig(Base):
 class WebSearchConfig(Base):
     """Web search tool configuration."""
 
-    api_key: str = ""  # Brave Search API key
+    api_key: SecretStr | None = None  # Brave Search API key
     max_results: int = 5
+
+    @field_serializer("api_key")
+    @classmethod
+    def _serialize_api_key(cls, v: SecretStr | None) -> str | None:
+        return v.get_secret_value() if v else None
 
 
 class WebToolsConfig(Base):
@@ -267,7 +295,7 @@ class ToolsConfig(Base):
 
     web: WebToolsConfig = Field(default_factory=WebToolsConfig)
     exec: ExecToolConfig = Field(default_factory=ExecToolConfig)
-    restrict_to_workspace: bool = False  # If true, restrict all tool access to workspace directory
+    restrict_to_workspace: bool = True  # If true, restrict all tool access to workspace directory
     mcp_servers: dict[str, MCPServerConfig] = Field(default_factory=dict)
 
 
@@ -279,6 +307,7 @@ class Config(BaseSettings):
     providers: ProvidersConfig = Field(default_factory=ProvidersConfig)
     gateway: GatewayConfig = Field(default_factory=GatewayConfig)
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
+    rate_limit: RateLimitConfig = Field(default_factory=RateLimitConfig)
 
     @property
     def workspace_path(self) -> Path:
@@ -302,14 +331,14 @@ class Config(BaseSettings):
         for spec in PROVIDERS:
             p = getattr(self.providers, spec.name, None)
             if p and model_prefix and normalized_prefix == spec.name:
-                if spec.is_oauth or p.api_key:
+                if spec.is_oauth or p.get_api_key_value():
                     return p, spec.name
 
         # Match by keyword (order follows PROVIDERS registry)
         for spec in PROVIDERS:
             p = getattr(self.providers, spec.name, None)
             if p and any(_kw_matches(kw) for kw in spec.keywords):
-                if spec.is_oauth or p.api_key:
+                if spec.is_oauth or p.get_api_key_value():
                     return p, spec.name
 
         # Fallback: gateways first, then others (follows registry order)
@@ -318,7 +347,7 @@ class Config(BaseSettings):
             if spec.is_oauth:
                 continue
             p = getattr(self.providers, spec.name, None)
-            if p and p.api_key:
+            if p and p.get_api_key_value():
                 return p, spec.name
         return None, None
 
@@ -335,7 +364,7 @@ class Config(BaseSettings):
     def get_api_key(self, model: str | None = None) -> str | None:
         """Get API key for the given model. Falls back to first available key."""
         p = self.get_provider(model)
-        return p.api_key if p else None
+        return p.get_api_key_value() if p else None
 
     def get_api_base(self, model: str | None = None) -> str | None:
         """Get API base URL for the given model. Applies default URLs for known gateways."""

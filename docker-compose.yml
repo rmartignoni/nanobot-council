@@ -4,6 +4,11 @@ x-nanobot: &nanobot-base
     dockerfile: Dockerfile
   command: ["gateway"]
   restart: unless-stopped
+  healthcheck:
+    test: ["CMD", "nanobot", "status"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
   deploy:
     resources:
       limits:
