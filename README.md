@@ -99,7 +99,125 @@ personas:
 
 A typical debate with 3 personas and 3 rounds makes ~10 LLM calls: 9 persona responses + 1 synthesis (plus 1-2 convergence checks). Actual cost depends on the models used.
 
-## Install
+## Getting Started (Docker — Recommended)
+
+Docker is the recommended way to run nanobot. Each instance gets its own isolated config, workspace, and personality.
+
+**1. Clone the repo**
+
+```bash
+git clone https://github.com/rmartignoni/council-nanobot.git
+cd council-nanobot
+```
+
+**2. Edit `docker-compose.yml`**
+
+The default file includes two example services (`alice` and `bob`). Adjust names and ports as needed.
+
+**3. Build the image**
+
+```bash
+./nanobot.sh build
+```
+
+**4. Run first-time setup**
+
+```bash
+./nanobot.sh onboard alice
+```
+
+This creates `nano_config/alice/` with the default workspace files.
+
+**5. Configure** (`nano_config/alice/config.json`)
+
+Add your API key, model, and (optionally) a chat channel:
+
+```json
+{
+  "providers": {
+    "openrouter": {
+      "apiKey": "sk-or-v1-xxx"
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": "anthropic/claude-sonnet-4-5"
+    }
+  },
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "token": "YOUR_BOT_TOKEN",
+      "allowFrom": ["YOUR_USER_ID"]
+    }
+  }
+}
+```
+
+> Get API keys: [OpenRouter](https://openrouter.ai/keys) (recommended, access to all models) · [Brave Search](https://brave.com/search/api/) (optional, for web search)
+
+**6. Start the service**
+
+```bash
+./nanobot.sh start alice
+```
+
+**7. (Optional) Personalize**
+
+Edit files in `nano_config/alice/workspace/` to customize your agent:
+
+- `AGENTS.md` — system prompt (instructions for the agent)
+- `SOUL.md` — personality and tone
+- `roundtables/*.yaml` — debate configurations
+
+### Configuration Files
+
+Each service has its own directory under `nano_config/<name>/`:
+
+```
+nano_config/alice/
+├── config.json              # API keys, providers, channels, tools
+├── cron/jobs.json           # Scheduled jobs
+└── workspace/
+    ├── AGENTS.md            # System prompt
+    ├── SOUL.md              # Personality
+    ├── USER.md              # User info
+    ├── HEARTBEAT.md         # Periodic tasks
+    ├── memory/              # MEMORY.md + HISTORY.md
+    ├── skills/              # Custom skills
+    ├── sessions/            # Conversation history
+    └── roundtables/         # Debate configs (YAML)
+```
+
+| File | Purpose |
+|------|---------|
+| `config.json` | API keys, LLM providers, chat channels, MCP servers, security settings |
+| `workspace/AGENTS.md` | System prompt — defines what the agent does and how it behaves |
+| `workspace/SOUL.md` | Personality — tone, style, language preferences |
+| `workspace/roundtables/*.yaml` | Roundtable debate configurations |
+
+### Management Script
+
+The `nanobot.sh` script wraps Docker Compose for easy management:
+
+| Command | Description |
+|---------|-------------|
+| `./nanobot.sh build` | Build the Docker image |
+| `./nanobot.sh start [service]` | Start services (all if omitted) |
+| `./nanobot.sh stop [service]` | Stop services (all if omitted) |
+| `./nanobot.sh restart [service]` | Restart services (all if omitted) |
+| `./nanobot.sh logs [service]` | Follow logs (all if omitted) |
+| `./nanobot.sh status` | Show running containers |
+| `./nanobot.sh onboard <service>` | First-time setup for a service |
+| `./nanobot.sh cli <service> <msg>` | Send a message to a service's agent |
+| `./nanobot.sh reset <service>` | Remove workspace and re-onboard (preserves config.json) |
+| `./nanobot.sh help` | Show usage help |
+
+## Getting Started (Native — Development)
+
+For local development or if you prefer running without Docker.
+
+**1. Install**
 
 ```bash
 git clone https://github.com/rmartignoni/council-nanobot.git
@@ -107,51 +225,36 @@ cd council-nanobot
 pip install -e .
 ```
 
-## Quick Start
-
-> [!TIP]
-> Set your API key in `~/.nanobot/config.json`.
-> Get API keys: [OpenRouter](https://openrouter.ai/keys) (Global) · [Brave Search](https://brave.com/search/api/) (optional, for web search)
-
-**1. Initialize**
+**2. Initialize**
 
 ```bash
 nanobot onboard
 ```
 
-**2. Configure** (`~/.nanobot/config.json`)
+**3. Configure** (`~/.nanobot/config.json`)
 
-Add or merge these **two parts** into your config (other options have defaults).
-
-*Set your API key* (e.g. OpenRouter, recommended for global users):
 ```json
 {
   "providers": {
     "openrouter": {
       "apiKey": "sk-or-v1-xxx"
     }
-  }
-}
-```
-
-*Set your model*:
-```json
-{
+  },
   "agents": {
     "defaults": {
-      "model": "anthropic/claude-opus-4-5"
+      "model": "anthropic/claude-sonnet-4-5"
     }
   }
 }
 ```
 
-**3. Chat**
+> Get API keys: [OpenRouter](https://openrouter.ai/keys) (recommended) · [Brave Search](https://brave.com/search/api/) (optional, for web search)
+
+**4. Chat**
 
 ```bash
 nanobot agent
 ```
-
-That's it! You have a working AI assistant in 2 minutes.
 
 ## Chat Apps
 
@@ -562,7 +665,7 @@ nanobot gateway
 
 ## Configuration
 
-Config file: `~/.nanobot/config.json`
+Config file: `~/.nanobot/config.json` (native) or `nano_config/<name>/config.json` (Docker)
 
 ### Providers
 
@@ -602,7 +705,7 @@ Codex uses OAuth instead of API keys. Requires a ChatGPT Plus or Pro account.
 nanobot provider login openai-codex
 ```
 
-**2. Set model** (merge into `~/.nanobot/config.json`):
+**2. Set model** (merge into config):
 ```json
 {
   "agents": {
@@ -657,7 +760,7 @@ Run your own model with vLLM or any OpenAI-compatible server, then add to config
 vllm serve meta-llama/Llama-3.1-8B-Instruct --port 8000
 ```
 
-**2. Add to config** (partial — merge into `~/.nanobot/config.json`):
+**2. Add to config** (partial — merge into config):
 
 *Provider (key can be any non-empty string for local):*
 ```json
@@ -812,11 +915,11 @@ nanobot cron remove <job_id>
 
 </details>
 
-## Docker
+## Docker Reference
 
 ### Multi-Instance with Docker Compose
 
-The `docker-compose.yml` supports running multiple nanobot instances, each with its own config, workspace, and personality:
+The `docker-compose.yml` uses a YAML anchor (`&nanobot-base`) so all instances share the same base config:
 
 ```yaml
 x-nanobot: &nanobot-base
@@ -835,39 +938,38 @@ x-nanobot: &nanobot-base
         memory: 256M
 
 services:
-  my-agent:
+  alice:
     <<: *nanobot-base
-    container_name: nanobot-my-agent
+    container_name: nanobot-alice
     volumes:
-      - ./nano_config/my-agent:/root/.nanobot
+      - ./nano_config/alice:/root/.nanobot
     ports:
       - "18791:18790"
 ```
 
-Each instance gets its own directory under `nano_config/`:
+**Adding a new instance:** duplicate a service block, change the name, container name, volume path, and port:
 
+```yaml
+  charlie:
+    <<: *nanobot-base
+    container_name: nanobot-charlie
+    volumes:
+      - ./nano_config/charlie:/root/.nanobot
+    ports:
+      - "18793:18790"
 ```
-nano_config/my-agent/
-├── config.json              # Providers, channels, tools
-├── cron/jobs.json           # Scheduled jobs
-└── workspace/
-    ├── AGENTS.md            # System prompt
-    ├── SOUL.md              # Personality
-    ├── USER.md              # User info
-    ├── HEARTBEAT.md         # Periodic tasks
-    ├── memory/              # MEMORY.md + HISTORY.md
-    ├── skills/              # Custom skills
-    ├── sessions/            # Conversation history
-    └── roundtables/         # Debate configs (YAML)
-```
+
+Then run:
 
 ```bash
-docker compose run --rm my-agent onboard     # first-time setup
-vim nano_config/my-agent/config.json         # add API keys
-docker compose up -d my-agent                # start gateway
+./nanobot.sh onboard charlie
+# edit nano_config/charlie/config.json
+./nanobot.sh start charlie
 ```
 
 ### Single Instance with Docker
+
+If you don't need Docker Compose, run a single container directly:
 
 ```bash
 docker build -t nanobot .
