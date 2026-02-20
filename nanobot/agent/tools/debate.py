@@ -1,6 +1,6 @@
 """Debate tool for initiating multi-persona roundtable discussions."""
 
-from typing import Any, Awaitable, Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 from nanobot.agent.tools.base import Tool
 

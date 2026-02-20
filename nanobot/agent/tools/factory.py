@@ -44,11 +44,13 @@ def build_safe_tools(
     registry.register(ListDirTool(workspace=workspace, allowed_dir=allowed_dir))
 
     # Shell tool
-    registry.register(ExecTool(
-        working_dir=str(workspace),
-        timeout=exec_config.timeout,
-        restrict_to_workspace=restrict_to_workspace,
-    ))
+    registry.register(
+        ExecTool(
+            working_dir=str(workspace),
+            timeout=exec_config.timeout,
+            restrict_to_workspace=restrict_to_workspace,
+        )
+    )
 
     # Web tools
     registry.register(WebSearchTool(api_key=brave_api_key))

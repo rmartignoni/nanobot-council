@@ -6,7 +6,9 @@ from typing import Any
 from nanobot.agent.tools.base import Tool
 
 
-def _resolve_path(path: str, workspace: Path | None = None, allowed_dir: Path | None = None) -> Path:
+def _resolve_path(
+    path: str, workspace: Path | None = None, allowed_dir: Path | None = None
+) -> Path:
     """Resolve path against workspace (if relative) and enforce directory restriction."""
     p = Path(path).expanduser()
     if not p.is_absolute() and workspace:
@@ -27,24 +29,19 @@ class ReadFileTool(Tool):
     @property
     def name(self) -> str:
         return "read_file"
-    
+
     @property
     def description(self) -> str:
         return "Read the contents of a file at the given path."
-    
+
     @property
     def parameters(self) -> dict[str, Any]:
         return {
             "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "The file path to read"
-                }
-            },
-            "required": ["path"]
+            "properties": {"path": {"type": "string", "description": "The file path to read"}},
+            "required": ["path"],
         }
-    
+
     async def execute(self, path: str, **kwargs: Any) -> str:
         try:
             file_path = _resolve_path(path, self._workspace, self._allowed_dir)
@@ -71,28 +68,22 @@ class WriteFileTool(Tool):
     @property
     def name(self) -> str:
         return "write_file"
-    
+
     @property
     def description(self) -> str:
         return "Write content to a file at the given path. Creates parent directories if needed."
-    
+
     @property
     def parameters(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "The file path to write to"
-                },
-                "content": {
-                    "type": "string",
-                    "description": "The content to write"
-                }
+                "path": {"type": "string", "description": "The file path to write to"},
+                "content": {"type": "string", "description": "The content to write"},
             },
-            "required": ["path", "content"]
+            "required": ["path", "content"],
         }
-    
+
     async def execute(self, path: str, content: str, **kwargs: Any) -> str:
         try:
             file_path = _resolve_path(path, self._workspace, self._allowed_dir)
@@ -115,32 +106,23 @@ class EditFileTool(Tool):
     @property
     def name(self) -> str:
         return "edit_file"
-    
+
     @property
     def description(self) -> str:
         return "Edit a file by replacing old_text with new_text. The old_text must exist exactly in the file."
-    
+
     @property
     def parameters(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "The file path to edit"
-                },
-                "old_text": {
-                    "type": "string",
-                    "description": "The exact text to find and replace"
-                },
-                "new_text": {
-                    "type": "string",
-                    "description": "The text to replace with"
-                }
+                "path": {"type": "string", "description": "The file path to edit"},
+                "old_text": {"type": "string", "description": "The exact text to find and replace"},
+                "new_text": {"type": "string", "description": "The text to replace with"},
             },
-            "required": ["path", "old_text", "new_text"]
+            "required": ["path", "old_text", "new_text"],
         }
-    
+
     async def execute(self, path: str, old_text: str, new_text: str, **kwargs: Any) -> str:
         try:
             file_path = _resolve_path(path, self._workspace, self._allowed_dir)
@@ -150,7 +132,7 @@ class EditFileTool(Tool):
             content = file_path.read_text(encoding="utf-8")
 
             if old_text not in content:
-                return f"Error: old_text not found in file. Make sure it matches exactly."
+                return "Error: old_text not found in file. Make sure it matches exactly."
 
             # Count occurrences
             count = content.count(old_text)
@@ -177,24 +159,19 @@ class ListDirTool(Tool):
     @property
     def name(self) -> str:
         return "list_dir"
-    
+
     @property
     def description(self) -> str:
         return "List the contents of a directory."
-    
+
     @property
     def parameters(self) -> dict[str, Any]:
         return {
             "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "The directory path to list"
-                }
-            },
-            "required": ["path"]
+            "properties": {"path": {"type": "string", "description": "The directory path to list"}},
+            "required": ["path"],
         }
-    
+
     async def execute(self, path: str, **kwargs: Any) -> str:
         try:
             dir_path = _resolve_path(path, self._workspace, self._allowed_dir)

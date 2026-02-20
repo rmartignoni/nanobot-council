@@ -15,18 +15,18 @@ def gateway(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
 ):
     """Start the nanobot gateway."""
-    from nanobot.config.loader import load_config, get_data_dir
     from nanobot.bus.queue import MessageBus
     from nanobot.channels.manager import ChannelManager
-    from nanobot.session.manager import SessionManager
+    from nanobot.cli.commands import _create_agent_loop, _setup_logging
+    from nanobot.config.loader import get_data_dir, load_config
     from nanobot.cron.service import CronService
     from nanobot.cron.types import CronJob
     from nanobot.heartbeat.service import HeartbeatService
-
-    from nanobot.cli.commands import _create_agent_loop, _setup_logging
+    from nanobot.session.manager import SessionManager
 
     if verbose:
         import logging
+
         logging.basicConfig(level=logging.DEBUG)
 
     _setup_logging()
@@ -59,12 +59,16 @@ def gateway(
         )
         if job.payload.deliver and job.payload.to:
             from nanobot.bus.events import OutboundMessage
-            await bus.publish_outbound(OutboundMessage(
-                channel=job.payload.channel or "cli",
-                chat_id=job.payload.to,
-                content=response or ""
-            ))
+
+            await bus.publish_outbound(
+                OutboundMessage(
+                    channel=job.payload.channel or "cli",
+                    chat_id=job.payload.to,
+                    content=response or "",
+                )
+            )
         return response
+
     cron.on_job = on_cron_job
 
     # Create heartbeat service
@@ -76,7 +80,7 @@ def gateway(
         workspace=config.workspace_path,
         on_heartbeat=on_heartbeat,
         interval_s=30 * 60,  # 30 minutes
-        enabled=True
+        enabled=True,
     )
 
     # Create channel manager
@@ -91,7 +95,7 @@ def gateway(
     if cron_status["jobs"] > 0:
         console.print(f"[green]✓[/green] Cron: {cron_status['jobs']} scheduled jobs")
 
-    console.print(f"[green]✓[/green] Heartbeat: every 30m")
+    console.print("[green]✓[/green] Heartbeat: every 30m")
 
     async def run():
         try:

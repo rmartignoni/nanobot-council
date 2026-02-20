@@ -7,11 +7,11 @@ from typing import Any, Awaitable, Callable
 import yaml
 from loguru import logger
 
-from nanobot.agent.debate.config import RoundtableConfig, PersonaConfig
+from nanobot.agent.debate.config import PersonaConfig, RoundtableConfig
 from nanobot.agent.debate.persona import Persona
 from nanobot.agent.tools.registry import ToolRegistry
+from nanobot.config.schema import Config
 from nanobot.providers.base import LLMProvider
-
 
 # Tools that personas must never have access to (agent-level tools only)
 _BLOCKED_PERSONA_TOOLS = frozenset({"message", "spawn", "debate", "cron"})
@@ -30,7 +30,7 @@ class DebateOrchestrator:
         self,
         workspace: Path,
         provider: LLMProvider,
-        config: "Config",
+        config: Config,
         parent_tools: ToolRegistry,
         model: str | None = None,
         temperature: float = 0.7,
@@ -39,7 +39,7 @@ class DebateOrchestrator:
         exec_config: Any = None,
         restrict_to_workspace: bool = False,
     ):
-        from nanobot.config.schema import Config, ExecToolConfig
+        from nanobot.config.schema import ExecToolConfig
 
         self.workspace = workspace
         self.provider = provider
@@ -95,8 +95,12 @@ class DebateOrchestrator:
         Returns:
             The synthesized debate result.
         """
-        logger.info("Starting debate '{}' with {} personas, max {} rounds",
-                     roundtable.name, len(roundtable.personas), roundtable.rounds.max)
+        logger.info(
+            "Starting debate '{}' with {} personas, max {} rounds",
+            roundtable.name,
+            len(roundtable.personas),
+            roundtable.rounds.max,
+        )
 
         if on_progress:
             names = ", ".join(p.name for p in roundtable.personas)
@@ -106,18 +110,19 @@ class DebateOrchestrator:
         transcript_entries: list[dict[str, str]] = []  # [{round, persona, response}]
 
         for round_num in range(1, roundtable.rounds.max + 1):
-            logger.info("Debate '{}' round {}/{}", roundtable.name, round_num, roundtable.rounds.max)
+            logger.info(
+                "Debate '{}' round {}/{}", roundtable.name, round_num, roundtable.rounds.max
+            )
 
             if on_progress:
                 await on_progress(f"debate round {round_num}/{roundtable.rounds.max}")
 
-            transcript_text = self._format_transcript(transcript_entries) if transcript_entries else None
+            transcript_text = (
+                self._format_transcript(transcript_entries) if transcript_entries else None
+            )
 
             # Run all personas in parallel for this round
-            tasks = [
-                persona.respond(question, transcript_text, round_num)
-                for persona in personas
-            ]
+            tasks = [persona.respond(question, transcript_text, round_num) for persona in personas]
             responses = await asyncio.gather(*tasks, return_exceptions=True)
 
             # Collect responses
@@ -125,20 +130,26 @@ class DebateOrchestrator:
             for persona, response in zip(personas, responses):
                 if isinstance(response, Exception):
                     text = f"[Error: {response}]"
-                    logger.error("Persona [{}] round {} failed: {}", persona.name, round_num, response)
+                    logger.error(
+                        "Persona [{}] round {} failed: {}", persona.name, round_num, response
+                    )
                 else:
                     text = response
-                round_entries.append({
-                    "round": str(round_num),
-                    "persona": persona.name,
-                    "response": text,
-                })
+                round_entries.append(
+                    {
+                        "round": str(round_num),
+                        "persona": persona.name,
+                        "response": text,
+                    }
+                )
             transcript_entries.extend(round_entries)
 
             # Check convergence after min_rounds
-            if (roundtable.rounds.convergence
-                    and round_num >= roundtable.rounds.min
-                    and round_num < roundtable.rounds.max):
+            if (
+                roundtable.rounds.convergence
+                and round_num >= roundtable.rounds.min
+                and round_num < roundtable.rounds.max
+            ):
                 if await self._check_convergence(question, transcript_entries, roundtable):
                     logger.info("Debate '{}' converged at round {}", roundtable.name, round_num)
                     if on_progress:
@@ -159,14 +170,16 @@ class DebateOrchestrator:
         for pc in roundtable.personas:
             provider, model = self._resolve_persona_provider(pc)
             tools = self._build_persona_tools(pc)
-            personas.append(Persona(
-                config=pc,
-                provider=provider,
-                model=model,
-                tools=tools,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-            ))
+            personas.append(
+                Persona(
+                    config=pc,
+                    provider=provider,
+                    model=model,
+                    tools=tools,
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens,
+                )
+            )
         return personas
 
     def _resolve_persona_provider(self, pc: PersonaConfig) -> tuple[LLMProvider, str]:
@@ -184,7 +197,9 @@ class DebateOrchestrator:
         p = self.config.get_provider(persona_model)
 
         if not p or not p.api_key:
-            logger.warning("No API key for persona model {}, falling back to parent provider", persona_model)
+            logger.warning(
+                "No API key for persona model {}, falling back to parent provider", persona_model
+            )
             return self.provider, persona_model
 
         persona_provider = LiteLLMProvider(
@@ -211,7 +226,9 @@ class DebateOrchestrator:
             if tool:
                 registry.register(tool)
             else:
-                logger.warning("Tool '{}' not found in parent registry for persona '{}'", tool_name, pc.name)
+                logger.warning(
+                    "Tool '{}' not found in parent registry for persona '{}'", tool_name, pc.name
+                )
 
         return registry
 
@@ -240,7 +257,10 @@ class DebateOrchestrator:
 
         response = await orch_provider.chat(
             messages=[
-                {"role": "system", "content": "You are a debate moderator. Assess convergence concisely."},
+                {
+                    "role": "system",
+                    "content": "You are a debate moderator. Assess convergence concisely.",
+                },
                 {"role": "user", "content": prompt},
             ],
             model=orch_model,
@@ -282,7 +302,9 @@ class DebateOrchestrator:
 
         return response.content or "[Synthesis produced no output]"
 
-    def _resolve_orchestrator_provider(self, roundtable: RoundtableConfig) -> tuple[LLMProvider, str]:
+    def _resolve_orchestrator_provider(
+        self, roundtable: RoundtableConfig
+    ) -> tuple[LLMProvider, str]:
         """Resolve provider for the orchestrator."""
         orch_model = roundtable.orchestrator.model or self.model
         if orch_model == self.model:

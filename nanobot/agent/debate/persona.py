@@ -6,8 +6,8 @@ from typing import Any
 from loguru import logger
 
 from nanobot.agent.debate.config import PersonaConfig
-from nanobot.providers.base import LLMProvider
 from nanobot.agent.tools.registry import ToolRegistry
+from nanobot.providers.base import LLMProvider
 
 
 class Persona:
@@ -88,29 +88,37 @@ class Persona:
                     }
                     for tc in response.tool_calls
                 ]
-                messages.append({
-                    "role": "assistant",
-                    "content": response.content or "",
-                    "tool_calls": tool_call_dicts,
-                })
+                messages.append(
+                    {
+                        "role": "assistant",
+                        "content": response.content or "",
+                        "tool_calls": tool_call_dicts,
+                    }
+                )
 
                 for tool_call in response.tool_calls:
                     logger.debug("Persona [{}] executing: {}", self.name, tool_call.name)
                     result = await self.tools.execute(tool_call.name, tool_call.arguments)
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "name": tool_call.name,
-                        "content": result,
-                    })
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "name": tool_call.name,
+                            "content": result,
+                        }
+                    )
             else:
                 final_result = response.content
                 break
 
         if final_result is None:
-            final_result = f"[{self.name} did not produce a response after {max_iterations} iterations]"
+            final_result = (
+                f"[{self.name} did not produce a response after {max_iterations} iterations]"
+            )
 
-        logger.info("Persona [{}] round {} response ({} chars)", self.name, round_num, len(final_result))
+        logger.info(
+            "Persona [{}] round {} response ({} chars)", self.name, round_num, len(final_result)
+        )
         return final_result
 
     def _build_system_prompt(self, round_num: int) -> str:
@@ -122,8 +130,7 @@ class Persona:
         )
         if round_num == 1:
             instructions += (
-                " Provide your initial analysis from your perspective. "
-                "Be specific and substantive."
+                " Provide your initial analysis from your perspective. Be specific and substantive."
             )
         else:
             instructions += (

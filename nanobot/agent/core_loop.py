@@ -24,11 +24,13 @@ def _strip_think(text: str | None) -> str | None:
 
 def _tool_hint(tool_calls: list) -> str:
     """Format tool calls as concise hint, e.g. 'web_search("query")'."""
+
     def _fmt(tc):
         val = next(iter(tc.arguments.values()), None) if tc.arguments else None
         if not isinstance(val, str):
             return tc.name
         return f'{tc.name}("{val[:40]}...")' if len(val) > 40 else f'{tc.name}("{val}")'
+
     return ", ".join(_fmt(tc) for tc in tool_calls)
 
 
@@ -126,19 +128,23 @@ async def run_tool_loop(
                     logger.info("Tool call: {}({})", tool_call.name, args_str[:200])
 
                 result = await tools.execute(tool_call.name, tool_call.arguments)
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "name": tool_call.name,
-                    "content": result,
-                })
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "name": tool_call.name,
+                        "content": result,
+                    }
+                )
         else:
             final_content = _strip_think(response.content)
             # Some models send an interim text response before tool calls.
             # Give them one retry; don't forward the text to avoid duplicates.
             if text_only_retry and not tools_used and not text_only_retried and final_content:
                 text_only_retried = True
-                logger.debug("Interim text response (no tools used yet), retrying: {}", final_content[:80])
+                logger.debug(
+                    "Interim text response (no tools used yet), retrying: {}", final_content[:80]
+                )
                 final_content = None
                 continue
             break

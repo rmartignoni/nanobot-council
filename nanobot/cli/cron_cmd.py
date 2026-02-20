@@ -38,12 +38,17 @@ def cron_list(
     import time
     from datetime import datetime as _dt
     from zoneinfo import ZoneInfo
+
     for job in jobs:
         # Format schedule
         if job.schedule.kind == "every":
             sched = f"every {(job.schedule.every_ms or 0) // 1000}s"
         elif job.schedule.kind == "cron":
-            sched = f"{job.schedule.expr or ''} ({job.schedule.tz})" if job.schedule.tz else (job.schedule.expr or "")
+            sched = (
+                f"{job.schedule.expr or ''} ({job.schedule.tz})"
+                if job.schedule.tz
+                else (job.schedule.expr or "")
+            )
         else:
             sched = "one-time"
 
@@ -70,11 +75,15 @@ def cron_add(
     message: str = typer.Option(..., "--message", "-m", help="Message for agent"),
     every: int = typer.Option(None, "--every", "-e", help="Run every N seconds"),
     cron_expr: str = typer.Option(None, "--cron", "-c", help="Cron expression (e.g. '0 9 * * *')"),
-    tz: str | None = typer.Option(None, "--tz", help="IANA timezone for cron (e.g. 'America/Vancouver')"),
+    tz: str | None = typer.Option(
+        None, "--tz", help="IANA timezone for cron (e.g. 'America/Vancouver')"
+    ),
     at: str = typer.Option(None, "--at", help="Run once at time (ISO format)"),
     deliver: bool = typer.Option(False, "--deliver", "-d", help="Deliver response to channel"),
     to: str = typer.Option(None, "--to", help="Recipient for delivery"),
-    channel: str = typer.Option(None, "--channel", help="Channel for delivery (e.g. 'telegram', 'whatsapp')"),
+    channel: str = typer.Option(
+        None, "--channel", help="Channel for delivery (e.g. 'telegram', 'whatsapp')"
+    ),
 ):
     """Add a scheduled job."""
     from nanobot.config.loader import get_data_dir
@@ -92,6 +101,7 @@ def cron_add(
         schedule = CronSchedule(kind="cron", expr=cron_expr, tz=tz)
     elif at:
         import datetime
+
         dt = datetime.datetime.fromisoformat(at)
         schedule = CronSchedule(kind="at", at_ms=int(dt.timestamp() * 1000))
     else:
@@ -161,13 +171,13 @@ def cron_run(
 ):
     """Manually run a job."""
     from loguru import logger
-    from nanobot.config.loader import load_config, get_data_dir
-    from nanobot.cron.service import CronService
-    from nanobot.cron.types import CronJob
-    from nanobot.bus.queue import MessageBus
 
+    from nanobot.bus.queue import MessageBus
     from nanobot.cli.commands import _create_agent_loop
     from nanobot.cli.terminal import _print_agent_response
+    from nanobot.config.loader import get_data_dir, load_config
+    from nanobot.cron.service import CronService
+    from nanobot.cron.types import CronJob
 
     logger.disable("nanobot")
 

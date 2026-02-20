@@ -21,7 +21,9 @@ def onboard():
     if config_path.exists():
         console.print(f"[yellow]Config already exists at {config_path}[/yellow]")
         console.print("  [bold]y[/bold] = overwrite with defaults (existing values will be lost)")
-        console.print("  [bold]N[/bold] = refresh config, keeping existing values and adding new fields")
+        console.print(
+            "  [bold]N[/bold] = refresh config, keeping existing values and adding new fields"
+        )
         if typer.confirm("Overwrite?"):
             config = Config()
             save_config(config)
@@ -29,7 +31,9 @@ def onboard():
         else:
             config = load_config()
             save_config(config)
-            console.print(f"[green]✓[/green] Config refreshed at {config_path} (existing values preserved)")
+            console.print(
+                f"[green]✓[/green] Config refreshed at {config_path} (existing values preserved)"
+            )
     else:
         save_config(Config())
         console.print(f"[green]✓[/green] Created config at {config_path}")
@@ -48,8 +52,10 @@ def onboard():
     console.print("\nNext steps:")
     console.print("  1. Add your API key to [cyan]~/.nanobot/config.json[/cyan]")
     console.print("     Get one at: https://openrouter.ai/keys")
-    console.print("  2. Chat: [cyan]nanobot agent -m \"Hello!\"[/cyan]")
-    console.print("\n[dim]Want Telegram/WhatsApp? See: https://github.com/HKUDS/nanobot#-chat-apps[/dim]")
+    console.print('  2. Chat: [cyan]nanobot agent -m "Hello!"[/cyan]')
+    console.print(
+        "\n[dim]Want Telegram/WhatsApp? See: https://github.com/HKUDS/nanobot#-chat-apps[/dim]"
+    )
 
 
 def _create_workspace_templates(workspace: Path):
@@ -114,7 +120,8 @@ Instructions for periodic heartbeat wake-ups.
     memory_dir.mkdir(exist_ok=True)
     memory_file = memory_dir / "MEMORY.md"
     if not memory_file.exists():
-        memory_file.write_text("""# Long-term Memory
+        memory_file.write_text(
+            """# Long-term Memory
 
 This file stores important information that should persist across sessions.
 
@@ -129,7 +136,9 @@ This file stores important information that should persist across sessions.
 ## Important Notes
 
 (Things to remember)
-""", encoding="utf-8")
+""",
+            encoding="utf-8",
+        )
         console.print("  [dim]Created memory/MEMORY.md[/dim]")
 
     history_file = memory_dir / "HISTORY.md"
@@ -150,6 +159,7 @@ This file stores important information that should persist across sessions.
 def _copy_bundled_roundtables(roundtables_dir: Path):
     """Copy bundled example roundtables to workspace (skip existing)."""
     import shutil
+
     bundled = Path(__file__).parent.parent / "roundtables"  # nanobot/roundtables/
     if not bundled.is_dir():
         return

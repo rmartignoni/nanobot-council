@@ -26,7 +26,7 @@ from nanobot.providers.base import LLMProvider
 from nanobot.session.manager import Session, SessionManager
 
 if TYPE_CHECKING:
-    from nanobot.config.schema import ExecToolConfig
+    from nanobot.config.schema import Config, ExecToolConfig
     from nanobot.cron.service import CronService
 
 
@@ -58,9 +58,8 @@ class AgentLoop:
         restrict_to_workspace: bool = False,
         session_manager: SessionManager | None = None,
         mcp_servers: dict | None = None,
-        config: "Config | None" = None,
+        config: Config | None = None,
     ):
-        from nanobot.config.schema import ExecToolConfig
         self.bus = bus
         self.provider = provider
         self.workspace = workspace
@@ -129,6 +128,7 @@ class AgentLoop:
         # Debate tool (for multi-persona roundtable discussions)
         if self._config:
             from nanobot.agent.debate.orchestrator import DebateOrchestrator
+
             orchestrator = DebateOrchestrator(
                 workspace=self.workspace,
                 provider=self.provider,
@@ -149,6 +149,7 @@ class AgentLoop:
             return
         self._mcp_connecting = True
         from nanobot.agent.tools.mcp import connect_mcp_servers
+
         try:
             self._mcp_stack = AsyncExitStack()
             await self._mcp_stack.__aenter__()
@@ -218,22 +219,26 @@ class AgentLoop:
 
         while self._running:
             try:
-                msg = await asyncio.wait_for(
-                    self.bus.consume_inbound(),
-                    timeout=1.0
-                )
+                msg = await asyncio.wait_for(self.bus.consume_inbound(), timeout=1.0)
                 try:
                     response = await self._process_message(msg)
-                    await self.bus.publish_outbound(response or OutboundMessage(
-                        channel=msg.channel, chat_id=msg.chat_id, content="",
-                    ))
+                    await self.bus.publish_outbound(
+                        response
+                        or OutboundMessage(
+                            channel=msg.channel,
+                            chat_id=msg.chat_id,
+                            content="",
+                        )
+                    )
                 except Exception as e:
                     logger.error("Error processing message: {}", e)
-                    await self.bus.publish_outbound(OutboundMessage(
-                        channel=msg.channel,
-                        chat_id=msg.chat_id,
-                        content=f"Sorry, I encountered an error: {str(e)}"
-                    ))
+                    await self.bus.publish_outbound(
+                        OutboundMessage(
+                            channel=msg.channel,
+                            chat_id=msg.chat_id,
+                            content=f"Sorry, I encountered an error: {str(e)}",
+                        )
+                    )
             except asyncio.TimeoutError:
                 continue
 
@@ -293,11 +298,17 @@ class AgentLoop:
                 await self._consolidate_memory(temp_session, archive_all=True)
 
             self._track_task(asyncio.create_task(_consolidate_and_cleanup()))
-            return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
-                                  content="New session started. Memory consolidation in progress.")
+            return OutboundMessage(
+                channel=msg.channel,
+                chat_id=msg.chat_id,
+                content="New session started. Memory consolidation in progress.",
+            )
         if cmd == "/help":
-            return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
-                                  content="🐈 nanobot commands:\n/new — Start a new conversation\n/help — Show available commands")
+            return OutboundMessage(
+                channel=msg.channel,
+                chat_id=msg.chat_id,
+                content="🐈 nanobot commands:\n/new — Start a new conversation\n/help — Show available commands",
+            )
 
         if len(session.messages) > self.memory_window and session.key not in self._consolidating:
             self._consolidating.add(session.key)
@@ -313,10 +324,14 @@ class AgentLoop:
         async def _bus_progress(content: str) -> None:
             meta = dict(msg.metadata or {})
             meta["_progress"] = True
-            await self.bus.publish_outbound(OutboundMessage(
-                channel=msg.channel, chat_id=msg.chat_id, content=content,
-                metadata=meta,
-            ))
+            await self.bus.publish_outbound(
+                OutboundMessage(
+                    channel=msg.channel,
+                    chat_id=msg.chat_id,
+                    content=content,
+                    metadata=meta,
+                )
+            )
 
         self._current_progress = on_progress or _bus_progress
         self._set_tool_context(msg.channel, msg.chat_id, msg.metadata.get("message_id"))
@@ -333,7 +348,8 @@ class AgentLoop:
         )
 
         final_content, tools_used = await self._run_agent_loop(
-            initial_messages, on_progress=self._current_progress,
+            initial_messages,
+            on_progress=self._current_progress,
         )
 
         if final_content is None:
@@ -343,8 +359,9 @@ class AgentLoop:
         logger.info("Response to {}:{}: {}", msg.channel, msg.sender_id, preview)
 
         session.add_message("user", msg.content)
-        session.add_message("assistant", final_content,
-                            tools_used=tools_used if tools_used else None)
+        session.add_message(
+            "assistant", final_content, tools_used=tools_used if tools_used else None
+        )
         self.sessions.save(session)
 
         if message_tool := self.tools.get("message"):
@@ -355,7 +372,8 @@ class AgentLoop:
             channel=msg.channel,
             chat_id=msg.chat_id,
             content=final_content,
-            metadata=msg.metadata or {},  # Pass through for channel-specific needs (e.g. Slack thread_ts)
+            metadata=msg.metadata
+            or {},  # Pass through for channel-specific needs (e.g. Slack thread_ts)
         )
 
     async def _process_system_message(self, msg: InboundMessage) -> OutboundMessage | None:
@@ -396,9 +414,7 @@ class AgentLoop:
         self.sessions.save(session)
 
         return OutboundMessage(
-            channel=origin_channel,
-            chat_id=origin_chat_id,
-            content=final_content
+            channel=origin_channel, chat_id=origin_chat_id, content=final_content
         )
 
     async def _consolidate_memory(self, session, archive_all: bool = False) -> None:
@@ -413,29 +429,49 @@ class AgentLoop:
         if archive_all:
             old_messages = session.messages
             keep_count = 0
-            logger.info("Memory consolidation (archive_all): {} total messages archived", len(session.messages))
+            logger.info(
+                "Memory consolidation (archive_all): {} total messages archived",
+                len(session.messages),
+            )
         else:
             keep_count = self.memory_window // 2
             if len(session.messages) <= keep_count:
-                logger.debug("Session {}: No consolidation needed (messages={}, keep={})", session.key, len(session.messages), keep_count)
+                logger.debug(
+                    "Session {}: No consolidation needed (messages={}, keep={})",
+                    session.key,
+                    len(session.messages),
+                    keep_count,
+                )
                 return
 
             messages_to_process = len(session.messages) - session.last_consolidated
             if messages_to_process <= 0:
-                logger.debug("Session {}: No new messages to consolidate (last_consolidated={}, total={})", session.key, session.last_consolidated, len(session.messages))
+                logger.debug(
+                    "Session {}: No new messages to consolidate (last_consolidated={}, total={})",
+                    session.key,
+                    session.last_consolidated,
+                    len(session.messages),
+                )
                 return
 
-            old_messages = session.messages[session.last_consolidated:-keep_count]
+            old_messages = session.messages[session.last_consolidated : -keep_count]
             if not old_messages:
                 return
-            logger.info("Memory consolidation started: {} total, {} new to consolidate, {} keep", len(session.messages), len(old_messages), keep_count)
+            logger.info(
+                "Memory consolidation started: {} total, {} new to consolidate, {} keep",
+                len(session.messages),
+                len(old_messages),
+                keep_count,
+            )
 
         lines = []
         for m in old_messages:
             if not m.get("content"):
                 continue
             tools = f" [tools: {', '.join(m['tools_used'])}]" if m.get("tools_used") else ""
-            lines.append(f"[{m.get('timestamp', '?')[:16]}] {m['role'].upper()}{tools}: {m['content']}")
+            lines.append(
+                f"[{m.get('timestamp', '?')[:16]}] {m['role'].upper()}{tools}: {m['content']}"
+            )
         conversation = "\n".join(lines)
         current_memory = memory.read_long_term()
 
@@ -465,7 +501,10 @@ Respond with ONLY valid JSON, no markdown fences."""
             response = await asyncio.wait_for(
                 self.provider.chat(
                     messages=[
-                        {"role": "system", "content": "You are a memory consolidation agent. Respond only with valid JSON."},
+                        {
+                            "role": "system",
+                            "content": "You are a memory consolidation agent. Respond only with valid JSON.",
+                        },
                         {"role": "user", "content": prompt},
                     ],
                     model=self.model,
@@ -480,7 +519,10 @@ Respond with ONLY valid JSON, no markdown fences."""
                 text = text.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
             result = json_repair.loads(text)
             if not isinstance(result, dict):
-                logger.warning("Memory consolidation: unexpected response type, skipping. Response: {}", text[:200])
+                logger.warning(
+                    "Memory consolidation: unexpected response type, skipping. Response: {}",
+                    text[:200],
+                )
                 return
 
             if entry := result.get("history_entry"):
@@ -499,7 +541,11 @@ Respond with ONLY valid JSON, no markdown fences."""
                 session.last_consolidated = 0
             else:
                 session.last_consolidated = len(session.messages) - keep_count
-            logger.info("Memory consolidation done: {} messages, last_consolidated={}", len(session.messages), session.last_consolidated)
+            logger.info(
+                "Memory consolidation done: {} messages, last_consolidated={}",
+                len(session.messages),
+                session.last_consolidated,
+            )
         except asyncio.TimeoutError:
             logger.warning("Memory consolidation timed out after 60s")
         except Exception as e:
@@ -527,12 +573,9 @@ Respond with ONLY valid JSON, no markdown fences."""
             The agent's response.
         """
         await self._connect_mcp()
-        msg = InboundMessage(
-            channel=channel,
-            sender_id="user",
-            chat_id=chat_id,
-            content=content
-        )
+        msg = InboundMessage(channel=channel, sender_id="user", chat_id=chat_id, content=content)
 
-        response = await self._process_message(msg, session_key=session_key, on_progress=on_progress)
+        response = await self._process_message(
+            msg, session_key=session_key, on_progress=on_progress
+        )
         return response.content if response else ""

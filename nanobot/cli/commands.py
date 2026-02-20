@@ -5,7 +5,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from nanobot import __version__, __logo__
+from nanobot import __logo__, __version__
 from nanobot.config.schema import Config
 
 # ---------------------------------------------------------------------------
@@ -25,6 +25,7 @@ console = Console()
 # Version callback
 # ---------------------------------------------------------------------------
 
+
 def version_callback(value: bool):
     if value:
         console.print(f"{__logo__} nanobot v{__version__}")
@@ -33,9 +34,7 @@ def version_callback(value: bool):
 
 @app.callback()
 def main(
-    version: bool = typer.Option(
-        None, "--version", "-v", callback=version_callback, is_eager=True
-    ),
+    version: bool = typer.Option(None, "--version", "-v", callback=version_callback, is_eager=True),
 ):
     """nanobot - Personal AI Assistant."""
     pass
@@ -72,11 +71,12 @@ def _setup_logging() -> None:
 # Provider factory (shared by agent_cmd, gateway_cmd, cron_cmd)
 # ---------------------------------------------------------------------------
 
+
 def _make_provider(config: Config):
     """Create the appropriate LLM provider from config."""
+    from nanobot.providers.custom_provider import CustomProvider
     from nanobot.providers.litellm_provider import LiteLLMProvider
     from nanobot.providers.openai_codex_provider import OpenAICodexProvider
-    from nanobot.providers.custom_provider import CustomProvider
 
     model = config.agents.defaults.model
     provider_name = config.get_provider_name(model)
@@ -95,6 +95,7 @@ def _make_provider(config: Config):
         )
 
     from nanobot.providers.registry import find_by_name
+
     spec = find_by_name(provider_name)
     if not model.startswith("bedrock/") and not (p and p.api_key) and not (spec and spec.is_oauth):
         console.print("[red]Error: No API key configured.[/red]")
@@ -113,6 +114,7 @@ def _make_provider(config: Config):
 # ---------------------------------------------------------------------------
 # AgentLoop factory (replaces 3 duplicate instantiation sites)
 # ---------------------------------------------------------------------------
+
 
 def _create_agent_loop(
     config: Config,
@@ -134,7 +136,9 @@ def _create_agent_loop(
         max_tokens=config.agents.defaults.max_tokens,
         max_iterations=config.agents.defaults.max_tool_iterations,
         memory_window=config.agents.defaults.memory_window,
-        brave_api_key=config.tools.web.search.api_key.get_secret_value() if config.tools.web.search.api_key else None,
+        brave_api_key=config.tools.web.search.api_key.get_secret_value()
+        if config.tools.web.search.api_key
+        else None,
         exec_config=config.tools.exec,
         cron_service=cron_service,
         restrict_to_workspace=config.tools.restrict_to_workspace,
@@ -150,21 +154,25 @@ def _create_agent_loop(
 
 # Onboard
 from nanobot.cli.onboard_cmd import onboard as _onboard_fn  # noqa: E402
+
 app.command()(_onboard_fn)
 
 # Agent
 from nanobot.cli.agent_cmd import agent as _agent_fn  # noqa: E402
+
 app.command()(_agent_fn)
 
 # Gateway
 from nanobot.cli.gateway_cmd import gateway as _gateway_fn  # noqa: E402
+
 app.command()(_gateway_fn)
+
 
 # Status (small, kept inline)
 @app.command()
 def status():
     """Show nanobot status."""
-    from nanobot.config.loader import load_config, get_config_path
+    from nanobot.config.loader import get_config_path, load_config
 
     config_path = get_config_path()
     config = load_config()
@@ -172,8 +180,12 @@ def status():
 
     console.print(f"{__logo__} nanobot Status\n")
 
-    console.print(f"Config: {config_path} {'[green]✓[/green]' if config_path.exists() else '[red]✗[/red]'}")
-    console.print(f"Workspace: {workspace} {'[green]✓[/green]' if workspace.exists() else '[red]✗[/red]'}")
+    console.print(
+        f"Config: {config_path} {'[green]✓[/green]' if config_path.exists() else '[red]✗[/red]'}"
+    )
+    console.print(
+        f"Workspace: {workspace} {'[green]✓[/green]' if workspace.exists() else '[red]✗[/red]'}"
+    )
 
     if config_path.exists():
         from nanobot.providers.registry import PROVIDERS
@@ -195,17 +207,22 @@ def status():
                     console.print(f"{spec.label}: [dim]not set[/dim]")
             else:
                 has_key = bool(p.api_key)
-                console.print(f"{spec.label}: {'[green]✓[/green]' if has_key else '[dim]not set[/dim]'}")
+                console.print(
+                    f"{spec.label}: {'[green]✓[/green]' if has_key else '[dim]not set[/dim]'}"
+                )
 
 
 # Sub-apps: cron, provider, channels
 from nanobot.cli.cron_cmd import cron_app  # noqa: E402
+
 app.add_typer(cron_app, name="cron")
 
 from nanobot.cli.provider_cmd import provider_app  # noqa: E402
+
 app.add_typer(provider_app, name="provider")
 
 from nanobot.cli.channels_cmd import channels_app  # noqa: E402
+
 app.add_typer(channels_app, name="channels")
 
 
