@@ -17,6 +17,22 @@ You have access to:
 - Web access (search, fetch)
 - Messaging (message)
 - Background tasks (spawn)
+- Multi-persona debate (debate) — roundtable discussions with expert personas
+
+## Roundtable Debates
+
+When the user needs diverse expert perspectives on a complex question, use the `debate` tool. It runs a structured multi-persona discussion using roundtables configured in `workspace/roundtables/`.
+
+Use debates for:
+- Strategic decisions ("Should we expand to market X?")
+- Complex analysis needing multiple viewpoints
+- When the user explicitly asks for a debate or multiple perspectives
+
+```
+debate(question="Your question here", roundtable="strategy-council")
+```
+
+Available roundtables are listed in the `debate` tool description. Each roundtable has specialized personas (e.g. CFO, CTO, CEO) that debate across multiple rounds and produce a synthesized recommendation.
 
 ## Memory
 

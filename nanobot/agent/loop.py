@@ -25,6 +25,7 @@ from nanobot.agent.tools.web import WebFetchTool, WebSearchTool
 from nanobot.bus.events import InboundMessage, OutboundMessage
 from nanobot.bus.queue import MessageBus
 from nanobot.providers.base import LLMProvider
+from nanobot.agent.tools.debate import DebateTool
 from nanobot.session.manager import Session, SessionManager
 
 if TYPE_CHECKING:
@@ -60,6 +61,7 @@ class AgentLoop:
         restrict_to_workspace: bool = False,
         session_manager: SessionManager | None = None,
         mcp_servers: dict | None = None,
+        config: "Config | None" = None,
     ):
         from nanobot.config.schema import ExecToolConfig
         self.bus = bus
@@ -74,6 +76,7 @@ class AgentLoop:
         self.exec_config = exec_config or ExecToolConfig()
         self.cron_service = cron_service
         self.restrict_to_workspace = restrict_to_workspace
+        self._config = config  # Full config for debate provider resolution
 
         self.context = ContextBuilder(workspace)
         self.sessions = session_manager or SessionManager(workspace)
@@ -96,6 +99,7 @@ class AgentLoop:
         self._mcp_connected = False
         self._mcp_connecting = False
         self._consolidating: set[str] = set()  # Session keys with consolidation in progress
+        self._current_progress: Callable[[str], Awaitable[None]] | None = None
         self._register_default_tools()
 
     def _register_default_tools(self) -> None:
@@ -129,6 +133,23 @@ class AgentLoop:
         # Cron tool (for scheduling)
         if self.cron_service:
             self.tools.register(CronTool(self.cron_service))
+
+        # Debate tool (for multi-persona roundtable discussions)
+        if self._config:
+            from nanobot.agent.debate.orchestrator import DebateOrchestrator
+            orchestrator = DebateOrchestrator(
+                workspace=self.workspace,
+                provider=self.provider,
+                config=self._config,
+                parent_tools=self.tools,
+                model=self.model,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                brave_api_key=self.brave_api_key,
+                exec_config=self.exec_config,
+                restrict_to_workspace=self.restrict_to_workspace,
+            )
+            self.tools.register(DebateTool(orchestrator=orchestrator))
 
     async def _connect_mcp(self) -> None:
         """Connect to configured MCP servers (one-time, lazy)."""
@@ -165,6 +186,10 @@ class AgentLoop:
         if cron_tool := self.tools.get("cron"):
             if isinstance(cron_tool, CronTool):
                 cron_tool.set_context(channel, chat_id)
+
+        if debate_tool := self.tools.get("debate"):
+            if isinstance(debate_tool, DebateTool):
+                debate_tool.set_context(on_progress=self._current_progress)
 
     @staticmethod
     def _strip_think(text: str | None) -> str | None:
@@ -359,6 +384,15 @@ class AgentLoop:
 
             asyncio.create_task(_consolidate_and_unlock())
 
+        async def _bus_progress(content: str) -> None:
+            meta = dict(msg.metadata or {})
+            meta["_progress"] = True
+            await self.bus.publish_outbound(OutboundMessage(
+                channel=msg.channel, chat_id=msg.chat_id, content=content,
+                metadata=meta,
+            ))
+
+        self._current_progress = on_progress or _bus_progress
         self._set_tool_context(msg.channel, msg.chat_id, msg.metadata.get("message_id"))
         if message_tool := self.tools.get("message"):
             if isinstance(message_tool, MessageTool):
@@ -372,16 +406,8 @@ class AgentLoop:
             chat_id=msg.chat_id,
         )
 
-        async def _bus_progress(content: str) -> None:
-            meta = dict(msg.metadata or {})
-            meta["_progress"] = True
-            await self.bus.publish_outbound(OutboundMessage(
-                channel=msg.channel, chat_id=msg.chat_id, content=content,
-                metadata=meta,
-            ))
-
         final_content, tools_used = await self._run_agent_loop(
-            initial_messages, on_progress=on_progress or _bus_progress,
+            initial_messages, on_progress=self._current_progress,
         )
 
         if final_content is None:

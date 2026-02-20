@@ -1,0 +1,78 @@
+{
+  "agents": {
+    "defaults": {
+      "workspace": "~/.nanobot/workspace",
+      "model": "anthropic/claude-haiku-4-5",
+      "maxTokens": 8192,
+      "temperature": 0.7,
+      "maxToolIterations": 20,
+      "memoryWindow": 50
+    }
+  },
+  "channels": {
+    "telegram": {
+      "enabled": false,
+      "token": "",
+      "allowFrom": []
+    },
+    "discord": {
+      "enabled": false,
+      "token": "",
+      "allowFrom": []
+    },
+    "whatsapp": {
+      "enabled": false,
+      "bridgeUrl": "ws://localhost:3001",
+      "bridgeToken": "",
+      "allowFrom": []
+    },
+    "slack": {
+      "enabled": false,
+      "botToken": "",
+      "appToken": "",
+      "groupPolicy": "mention"
+    },
+    "email": {
+      "enabled": false,
+      "consentGranted": false,
+      "imapHost": "",
+      "imapPort": 993,
+      "imapUsername": "",
+      "imapPassword": "",
+      "smtpHost": "",
+      "smtpPort": 587,
+      "smtpUsername": "",
+      "smtpPassword": "",
+      "fromAddress": "",
+      "allowFrom": []
+    }
+  },
+  "providers": {
+    "openrouter": {
+      "apiKey": ""
+    },
+    "anthropic": {
+      "apiKey": ""
+    },
+    "openai": {
+      "apiKey": ""
+    }
+  },
+  "gateway": {
+    "host": "0.0.0.0",
+    "port": 18790
+  },
+  "tools": {
+    "web": {
+      "search": {
+        "apiKey": "",
+        "maxResults": 5
+      }
+    },
+    "exec": {
+      "timeout": 60
+    },
+    "restrictToWorkspace": false,
+    "mcpServers": {}
+  }
+}

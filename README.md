@@ -1,110 +1,113 @@
 <div align="center">
-  <img src="nanobot_logo.png" alt="nanobot" width="500">
-  <h1>nanobot: Ultra-Lightweight Personal AI Assistant</h1>
+  <img src="nanobot_logo.png" alt="nanobot-council" width="500">
+  <h1>nanobot-council</h1>
+  <p>nanobot fork with multi-persona roundtable debates</p>
   <p>
-    <a href="https://pypi.org/project/nanobot-ai/"><img src="https://img.shields.io/pypi/v/nanobot-ai" alt="PyPI"></a>
-    <a href="https://pepy.tech/project/nanobot-ai"><img src="https://static.pepy.tech/badge/nanobot-ai" alt="Downloads"></a>
     <img src="https://img.shields.io/badge/python-≥3.11-blue" alt="Python">
     <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-    <a href="./COMMUNICATION.md"><img src="https://img.shields.io/badge/Feishu-Group-E9DBFC?style=flat&logo=feishu&logoColor=white" alt="Feishu"></a>
-    <a href="./COMMUNICATION.md"><img src="https://img.shields.io/badge/WeChat-Group-C5EAB4?style=flat&logo=wechat&logoColor=white" alt="WeChat"></a>
-    <a href="https://discord.gg/MnCvHqpUGB"><img src="https://img.shields.io/badge/Discord-Community-5865F2?style=flat&logo=discord&logoColor=white" alt="Discord"></a>
+  </p>
+  <p>
+    <sub>Forked from <a href="https://github.com/HKUDS/nanobot">HKUDS/nanobot</a></sub>
   </p>
 </div>
 
-🐈 **nanobot** is an **ultra-lightweight** personal AI assistant inspired by [OpenClaw](https://github.com/openclaw/openclaw) 
+**nanobot-council** extends [nanobot](https://github.com/HKUDS/nanobot) with a **Roundtable** system — multiple LLM personas debate in parallel rounds with automatic convergence detection and final synthesis.
 
-⚡️ Delivers core agent functionality in just **~4,000** lines of code — **99% smaller** than Clawdbot's 430k+ lines.
+Everything else works the same: ultra-lightweight (~4,500 lines of core code), multi-provider, multi-channel, skills, subagents, MCP, cron, and more.
 
-📏 Real-time line count: **3,827 lines** (run `bash core_agent_lines.sh` to verify anytime)
+## Roundtable (Multi-Persona Debate)
 
-## 📢 News
+The roundtable system lets you run structured debates between personas with different expertise, LLM models, tools, and perspectives. The orchestrator manages rounds, checks for convergence, and synthesizes a final recommendation.
 
-- **2026-02-17** 🎉 Released **v0.1.4** — MCP support, progress streaming, new providers, and multiple channel improvements. Please see [release notes](https://github.com/HKUDS/nanobot/releases/tag/v0.1.4) for details.
-- **2026-02-16** 🦞 nanobot now integrates a [ClawHub](https://clawhub.ai) skill — search and install public agent skills.
-- **2026-02-15** 🔑 nanobot now supports OpenAI Codex provider with OAuth login support.
-- **2026-02-14** 🔌 nanobot now supports MCP! See [MCP section](#mcp-model-context-protocol) for details.
-- **2026-02-13** 🎉 Released **v0.1.3.post7** — includes security hardening and multiple improvements. **Please upgrade to the latest version to address security issues**. See [release notes](https://github.com/HKUDS/nanobot/releases/tag/v0.1.3.post7) for more details.
-- **2026-02-12** 🧠 Redesigned memory system — Less code, more reliable. Join the [discussion](https://github.com/HKUDS/nanobot/discussions/566) about it!
-- **2026-02-11** ✨ Enhanced CLI experience and added MiniMax support!
-- **2026-02-10** 🎉 Released **v0.1.3.post6** with improvements! Check the updates [notes](https://github.com/HKUDS/nanobot/releases/tag/v0.1.3.post6) and our [roadmap](https://github.com/HKUDS/nanobot/discussions/431).
-- **2026-02-09** 💬 Added Slack, Email, and QQ support — nanobot now supports multiple chat platforms!
-- **2026-02-08** 🔧 Refactored Providers—adding a new LLM provider now takes just 2 simple steps! Check [here](#providers).
+### How It Works
 
-<details>
-<summary>Earlier news</summary>
+```
+Question → [Persona A]  ──┐
+           [Persona B]  ──┼── Round 1 → Transcript → [Convergence?] → ... → Synthesis
+           [Persona C]  ──┘
+```
 
-- **2026-02-07** 🚀 Released **v0.1.3.post5** with Qwen support & several key improvements! Check [here](https://github.com/HKUDS/nanobot/releases/tag/v0.1.3.post5) for details.
-- **2026-02-06** ✨ Added Moonshot/Kimi provider, Discord integration, and enhanced security hardening!
-- **2026-02-05** ✨ Added Feishu channel, DeepSeek provider, and enhanced scheduled tasks support!
-- **2026-02-04** 🚀 Released **v0.1.3.post4** with multi-provider & Docker support! Check [here](https://github.com/HKUDS/nanobot/releases/tag/v0.1.3.post4) for details.
-- **2026-02-03** ⚡ Integrated vLLM for local LLM support and improved natural language task scheduling!
-- **2026-02-02** 🎉 nanobot officially launched! Welcome to try 🐈 nanobot!
+1. **You ask a question** — the agent picks (or you specify) a roundtable config
+2. **Parallel rounds** — all personas respond simultaneously, seeing the full transcript from prior rounds
+3. **Convergence check** — after `min_rounds`, the orchestrator LLM checks if personas have aligned
+4. **Synthesis** — the orchestrator produces a final, structured recommendation from the full debate
 
-</details>
+Each persona can use a **different LLM model**, **different tools**, and a **different temperature** — all defined in a simple YAML file.
 
-## Key Features of nanobot:
+### Bundled Roundtables
 
-🪶 **Ultra-Lightweight**: Just ~4,000 lines of core agent code — 99% smaller than Clawdbot.
+| Roundtable | Personas | Description |
+|------------|----------|-------------|
+| `strategy-council` | CFO, CTO, CEO | Executive team debate for strategic decisions |
+| `devils-advocate` | Champion, Critic | Stress-test an idea with opposing viewpoints |
 
-🔬 **Research-Ready**: Clean, readable code that's easy to understand, modify, and extend for research.
+### Usage
 
-⚡️ **Lightning Fast**: Minimal footprint means faster startup, lower resource usage, and quicker iterations.
+The agent calls the `debate` tool automatically when it detects a question that benefits from multiple perspectives, or you can be explicit:
 
-💎 **Easy-to-Use**: One-click to deploy and you're ready to go.
+```
+Debate whether we should migrate from PostgreSQL to DynamoDB. Use strategy-council.
+```
 
-## 🏗️ Architecture
+### Creating Custom Roundtables
 
-<p align="center">
-  <img src="nanobot_arch.png" alt="nanobot architecture" width="800">
-</p>
+Create a YAML file in `workspace/roundtables/`:
 
-## ✨ Features
+```yaml
+name: My Roundtable
+description: What this roundtable does
+trigger: auto  # auto | explicit
 
-<table align="center">
-  <tr align="center">
-    <th><p align="center">📈 24/7 Real-Time Market Analysis</p></th>
-    <th><p align="center">🚀 Full-Stack Software Engineer</p></th>
-    <th><p align="center">📅 Smart Daily Routine Manager</p></th>
-    <th><p align="center">📚 Personal Knowledge Assistant</p></th>
-  </tr>
-  <tr>
-    <td align="center"><p align="center"><img src="case/search.gif" width="180" height="400"></p></td>
-    <td align="center"><p align="center"><img src="case/code.gif" width="180" height="400"></p></td>
-    <td align="center"><p align="center"><img src="case/scedule.gif" width="180" height="400"></p></td>
-    <td align="center"><p align="center"><img src="case/memory.gif" width="180" height="400"></p></td>
-  </tr>
-  <tr>
-    <td align="center">Discovery • Insights • Trends</td>
-    <td align="center">Develop • Deploy • Scale</td>
-    <td align="center">Schedule • Automate • Organize</td>
-    <td align="center">Learn • Memory • Reasoning</td>
-  </tr>
-</table>
+orchestrator:
+  # model: anthropic/claude-haiku-4-5  # optional, defaults to agent's model
+  synthesis_prompt: |
+    Synthesize the debate into a clear recommendation.
 
-## 📦 Install
+rounds:
+  max: 3
+  min: 1
+  convergence: true  # check for early convergence after min rounds
 
-**Install from source** (latest features, recommended for development)
+personas:
+  - name: Optimist
+    system_prompt: |
+      You see the upside. Build the strongest case for the idea.
+    temperature: 0.7
+    tools: [web_search, web_fetch]
+
+  - name: Pessimist
+    system_prompt: |
+      You see the risks. Find every flaw and hidden cost.
+    temperature: 0.5
+    tools: [web_search, web_fetch]
+```
+
+### Persona Fields
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `name` | yes | — | Display name in the transcript |
+| `system_prompt` | yes | — | Persona's perspective and instructions |
+| `model` | no | agent's model | LLM model (e.g. `openai/gpt-4o`, `anthropic/claude-haiku-4-5`) |
+| `temperature` | no | 0.7 | Creativity level |
+| `max_tokens` | no | 4096 | Max response length |
+| `tools` | no | `[]` | Tools available to this persona (e.g. `web_search`, `web_fetch`, `exec`) |
+
+> **Note:** Personas can never access `message`, `spawn`, `debate`, or `cron` — these are agent-level tools only.
+
+### Cost Estimate
+
+A typical debate with 3 personas and 3 rounds makes ~10 LLM calls: 9 persona responses + 1 synthesis (plus 1-2 convergence checks). Actual cost depends on the models used.
+
+## Install
 
 ```bash
-git clone https://github.com/HKUDS/nanobot.git
-cd nanobot
+git clone https://github.com/rmartignoni/council-nanobot.git
+cd council-nanobot
 pip install -e .
 ```
 
-**Install with [uv](https://github.com/astral-sh/uv)** (stable, fast)
-
-```bash
-uv tool install nanobot-ai
-```
-
-**Install from PyPI** (stable)
-
-```bash
-pip install nanobot-ai
-```
-
-## 🚀 Quick Start
+## Quick Start
 
 > [!TIP]
 > Set your API key in `~/.nanobot/config.json`.
@@ -150,7 +153,7 @@ nanobot agent
 
 That's it! You have a working AI assistant in 2 minutes.
 
-## 💬 Chat Apps
+## Chat Apps
 
 Connect nanobot to your favorite chat platform.
 
@@ -557,18 +560,7 @@ nanobot gateway
 
 </details>
 
-## 🌐 Agent Social Network
-
-🐈 nanobot is capable of linking to the agent social network (agent community). **Just send one message and your nanobot joins automatically!**
-
-| Platform | How to Join (send this message to your bot) |
-|----------|-------------|
-| [**Moltbook**](https://www.moltbook.com/) | `Read https://moltbook.com/skill.md and follow the instructions to join Moltbook` |
-| [**ClawdChat**](https://clawdchat.ai/) | `Read https://clawdchat.ai/skill.md and follow the instructions to join ClawdChat` |
-
-Simply send the command above to your nanobot (via CLI or any chat channel), and it will handle the rest.
-
-## ⚙️ Configuration
+## Configuration
 
 Config file: `~/.nanobot/config.json`
 
@@ -775,8 +767,6 @@ Two transport modes are supported:
 MCP tools are automatically discovered and registered on startup. The LLM can use them alongside built-in tools — no extra configuration needed.
 
 
-
-
 ### Security
 
 > [!TIP]
@@ -822,104 +812,105 @@ nanobot cron remove <job_id>
 
 </details>
 
-## 🐳 Docker
+## Docker
 
-> [!TIP]
-> The `-v ~/.nanobot:/root/.nanobot` flag mounts your local config directory into the container, so your config and workspace persist across container restarts.
+### Multi-Instance with Docker Compose
 
-### Docker Compose
+The `docker-compose.yml` supports running multiple nanobot instances, each with its own config, workspace, and personality:
 
-```bash
-docker compose run --rm nanobot-cli onboard   # first-time setup
-vim ~/.nanobot/config.json                     # add API keys
-docker compose up -d nanobot-gateway           # start gateway
+```yaml
+x-nanobot: &nanobot-base
+  build:
+    context: .
+    dockerfile: Dockerfile
+  command: ["gateway"]
+  restart: unless-stopped
+  deploy:
+    resources:
+      limits:
+        cpus: '1'
+        memory: 1G
+      reservations:
+        cpus: '0.25'
+        memory: 256M
+
+services:
+  my-agent:
+    <<: *nanobot-base
+    container_name: nanobot-my-agent
+    volumes:
+      - ./nano_config/my-agent:/root/.nanobot
+    ports:
+      - "18791:18790"
+```
+
+Each instance gets its own directory under `nano_config/`:
+
+```
+nano_config/my-agent/
+├── config.json              # Providers, channels, tools
+├── cron/jobs.json           # Scheduled jobs
+└── workspace/
+    ├── AGENTS.md            # System prompt
+    ├── SOUL.md              # Personality
+    ├── USER.md              # User info
+    ├── HEARTBEAT.md         # Periodic tasks
+    ├── memory/              # MEMORY.md + HISTORY.md
+    ├── skills/              # Custom skills
+    ├── sessions/            # Conversation history
+    └── roundtables/         # Debate configs (YAML)
 ```
 
 ```bash
-docker compose run --rm nanobot-cli agent -m "Hello!"   # run CLI
-docker compose logs -f nanobot-gateway                   # view logs
-docker compose down                                      # stop
+docker compose run --rm my-agent onboard     # first-time setup
+vim nano_config/my-agent/config.json         # add API keys
+docker compose up -d my-agent                # start gateway
 ```
 
-### Docker
+### Single Instance with Docker
 
 ```bash
-# Build the image
 docker build -t nanobot .
 
-# Initialize config (first time only)
 docker run -v ~/.nanobot:/root/.nanobot --rm nanobot onboard
-
-# Edit config on host to add API keys
 vim ~/.nanobot/config.json
-
-# Run gateway (connects to enabled channels, e.g. Telegram/Discord/Mochat)
 docker run -v ~/.nanobot:/root/.nanobot -p 18790:18790 nanobot gateway
 
 # Or run a single command
 docker run -v ~/.nanobot:/root/.nanobot --rm nanobot agent -m "Hello!"
-docker run -v ~/.nanobot:/root/.nanobot --rm nanobot status
 ```
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 nanobot/
-├── agent/          # 🧠 Core agent logic
-│   ├── loop.py     #    Agent loop (LLM ↔ tool execution)
-│   ├── context.py  #    Prompt builder
-│   ├── memory.py   #    Persistent memory
-│   ├── skills.py   #    Skills loader
-│   ├── subagent.py #    Background task execution
-│   └── tools/      #    Built-in tools (incl. spawn)
-├── skills/         # 🎯 Bundled skills (github, weather, tmux...)
-├── channels/       # 📱 Chat channel integrations
-├── bus/            # 🚌 Message routing
-├── cron/           # ⏰ Scheduled tasks
-├── heartbeat/      # 💓 Proactive wake-up
-├── providers/      # 🤖 LLM providers (OpenRouter, etc.)
-├── session/        # 💬 Conversation sessions
-├── config/         # ⚙️ Configuration
-└── cli/            # 🖥️ Commands
+├── agent/              # Core agent logic
+│   ├── loop.py         #   Agent loop (LLM ↔ tool execution)
+│   ├── context.py      #   Prompt builder
+│   ├── memory.py       #   Persistent memory
+│   ├── skills.py       #   Skills loader
+│   ├── subagent.py     #   Background task execution
+│   ├── debate/         #   Roundtable debate system
+│   │   ├── config.py   #     Pydantic models (RoundtableConfig, PersonaConfig, etc.)
+│   │   ├── persona.py  #     Persona inner loop
+│   │   └── orchestrator.py  # Rounds, convergence, synthesis
+│   └── tools/          #   Built-in tools (incl. spawn, debate)
+├── skills/             # Bundled skills (github, weather, debate, tmux...)
+├── roundtables/        # Bundled roundtable configs (copied on onboard)
+├── channels/           # Chat channel integrations
+├── bus/                # Message routing
+├── cron/               # Scheduled tasks
+├── heartbeat/          # Proactive wake-up
+├── providers/          # LLM providers (OpenRouter, Anthropic, etc.)
+├── session/            # Conversation sessions
+├── config/             # Configuration (Pydantic schema)
+└── cli/                # CLI commands
 ```
 
-## 🤝 Contribute & Roadmap
+## Attribution
 
-PRs welcome! The codebase is intentionally small and readable. 🤗
-
-**Roadmap** — Pick an item and [open a PR](https://github.com/HKUDS/nanobot/pulls)!
-
-- [ ] **Multi-modal** — See and hear (images, voice, video)
-- [ ] **Long-term memory** — Never forget important context
-- [ ] **Better reasoning** — Multi-step planning and reflection
-- [ ] **More integrations** — Calendar and more
-- [ ] **Self-improvement** — Learn from feedback and mistakes
-
-### Contributors
-
-<a href="https://github.com/HKUDS/nanobot/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=HKUDS/nanobot&max=100&columns=12&updated=20260210" alt="Contributors" />
-</a>
-
-
-## ⭐ Star History
-
-<div align="center">
-  <a href="https://star-history.com/#HKUDS/nanobot&Date">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=HKUDS/nanobot&type=Date&theme=dark" />
-      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=HKUDS/nanobot&type=Date" />
-      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=HKUDS/nanobot&type=Date" style="border-radius: 15px; box-shadow: 0 0 30px rgba(0, 217, 255, 0.3);" />
-    </picture>
-  </a>
-</div>
+nanobot-council is a fork of [nanobot](https://github.com/HKUDS/nanobot) by [HKUDS](https://github.com/HKUDS). All credit for the core architecture, tools, providers, channels, and skills system goes to the original authors.
 
 <p align="center">
-  <em> Thanks for visiting ✨ nanobot!</em><br><br>
-  <img src="https://visitor-badge.laobi.icu/badge?page_id=HKUDS.nanobot&style=for-the-badge&color=00d4ff" alt="Views">
-</p>
-
-
-<p align="center">
-  <sub>nanobot is for educational, research, and technical exchange purposes only</sub>
+  <sub>nanobot-council is for educational, research, and technical exchange purposes only</sub>
 </p>

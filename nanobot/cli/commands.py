@@ -278,6 +278,24 @@ This file stores important information that should persist across sessions.
     skills_dir = workspace / "skills"
     skills_dir.mkdir(exist_ok=True)
 
+    # Create roundtables directory with example configs
+    roundtables_dir = workspace / "roundtables"
+    roundtables_dir.mkdir(exist_ok=True)
+    _copy_bundled_roundtables(roundtables_dir)
+
+
+def _copy_bundled_roundtables(roundtables_dir: Path):
+    """Copy bundled example roundtables to workspace (skip existing)."""
+    import shutil
+    bundled = Path(__file__).parent.parent / "roundtables"  # nanobot/roundtables/
+    if not bundled.is_dir():
+        return
+    for src in bundled.glob("*.yaml"):
+        dst = roundtables_dir / src.name
+        if not dst.exists():
+            shutil.copy2(src, dst)
+            console.print(f"  [dim]Created roundtables/{src.name}[/dim]")
+
 
 def _make_provider(config: Config):
     """Create the appropriate LLM provider from config."""
@@ -368,6 +386,7 @@ def gateway(
         restrict_to_workspace=config.tools.restrict_to_workspace,
         session_manager=session_manager,
         mcp_servers=config.tools.mcp_servers,
+        config=config,
     )
     
     # Set cron callback (needs agent)
@@ -484,8 +503,9 @@ def agent(
         cron_service=cron,
         restrict_to_workspace=config.tools.restrict_to_workspace,
         mcp_servers=config.tools.mcp_servers,
+        config=config,
     )
-    
+
     # Show spinner when logs are off (no output to miss); skip when logs are on
     def _thinking_ctx():
         if logs:
@@ -934,6 +954,7 @@ def cron_run(
         exec_config=config.tools.exec,
         restrict_to_workspace=config.tools.restrict_to_workspace,
         mcp_servers=config.tools.mcp_servers,
+        config=config,
     )
 
     store_path = get_data_dir() / "cron" / "jobs.json"

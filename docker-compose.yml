@@ -1,31 +1,31 @@
-x-common-config: &common-config
+x-nanobot: &nanobot-base
   build:
     context: .
     dockerfile: Dockerfile
-  volumes:
-    - ~/.nanobot:/root/.nanobot
+  command: ["gateway"]
+  restart: unless-stopped
+  deploy:
+    resources:
+      limits:
+        cpus: '1'
+        memory: 1G
+      reservations:
+        cpus: '0.25'
+        memory: 256M
 
 services:
-  nanobot-gateway:
-    container_name: nanobot-gateway
-    <<: *common-config
-    command: ["gateway"]
-    restart: unless-stopped
+  alice:
+    <<: *nanobot-base
+    container_name: nanobot-alice
+    volumes:
+      - ./nano_config/alice:/root/.nanobot
     ports:
-      - 18790:18790
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 1G
-        reservations:
-          cpus: '0.25'
-          memory: 256M
-  
-  nanobot-cli:
-    <<: *common-config
-    profiles:
-      - cli
-    command: ["status"]
-    stdin_open: true
-    tty: true
+      - "18791:18790"
+
+  bob:
+    <<: *nanobot-base
+    container_name: nanobot-bob
+    volumes:
+      - ./nano_config/bob:/root/.nanobot
+    ports:
+      - "18792:18790"

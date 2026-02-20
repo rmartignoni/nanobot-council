@@ -142,6 +142,39 @@ write_file(
 
 ---
 
+## Multi-Persona Debate (Roundtable)
+
+### debate
+Start a structured multi-persona debate where multiple experts discuss a question.
+```
+debate(question: str, roundtable: str = None) -> str
+```
+
+**Parameters:**
+- `question` — The topic or question to debate (required)
+- `roundtable` — Name of the roundtable config to use (optional, defaults to first available)
+
+**How it works:**
+1. Multiple personas analyze the question in parallel (round 1)
+2. Each persona sees the full transcript from previous rounds and reacts (rounds 2+)
+3. Convergence is checked after `min_rounds` — stops early if personas agree
+4. The orchestrator synthesizes all perspectives into a final recommendation
+
+**Configuration:** Roundtables are defined as YAML files in `workspace/roundtables/`. Each file specifies personas (name, system prompt, model, tools), round limits, and synthesis settings. See `skills/debate/SKILL.md` for the full YAML schema.
+
+**Example:**
+```
+debate(question="Should we migrate to microservices?", roundtable="strategy-council")
+```
+
+**Notes:**
+- Each persona can use a different LLM model/provider
+- Personas can use tools (web_search, exec, etc.) during their analysis
+- A typical 3-persona, 3-round debate makes ~10 LLM calls
+- Convergence detection reduces unnecessary rounds
+
+---
+
 ## Adding Custom Tools
 
 To add custom tools:
